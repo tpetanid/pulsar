@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="md:grid md:grid-cols-3 md:gap-6">
+        <div class="md:col-span-1">
+            <div class="px-4 sm:px-0">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                    {% if form.instance.pk %}Edit Owner{% else %}New Owner{% endif %}
+                </h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    {% if form.instance.pk %}
+                        Update the owner's information.
+                    {% else %}
+                        Add a new owner to the system.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="mt-5 md:mt-0 md:col-span-2">
+            <form method="post">
+                {% csrf_token %}
+                <div class="shadow sm:rounded-md sm:overflow-hidden">
+                    <div class="px-4 py-5 bg-white dark:bg-gray-800 space-y-6 sm:p-6">
+                        {% crispy form %}
+                    </div>
+                    <div class="px-4 py-3 bg-gray-50 dark:bg-gray-700 text-right sm:px-6">
+                        <a href="{% url 'owner_list' %}" class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 dark:hover:bg-gray-500">
+                            Cancel
+                        </a>
+                        <button type="submit" class="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            {% if form.instance.pk %}Update{% else %}Create{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dark input[type="text"],
+    .dark input[type="email"],
+    .dark textarea {
+        background-color: #374151 !important;
+        border-color: #4b5563 !important;
+        color: #e5e7eb !important;
+    }
+    .dark input[type="text"]:focus,
+    .dark input[type="email"]:focus,
+    .dark textarea:focus {
+        background-color: #374151 !important;
+        border-color: #3b82f6 !important;
+        color: #e5e7eb !important;
+    }
+    .dark label {
+        color: #ffffff !important;
+    }
+</style>
+{% endblock %} 

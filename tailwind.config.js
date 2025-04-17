@@ -4,6 +4,8 @@ module.exports = {
   content: [
     './templates/**/*.html',
     './main/templates/**/*.html',
+    './main/forms.py',
+    './venv/lib/python*/site-packages/crispy_tailwind/**/*.html',
     './node_modules/flowbite/**/*.js'
   ],
   theme: {

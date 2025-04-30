@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Owners - Vet Cardio App{% endblock title %}
+
+{% block extra_head %}
+    {# Add specific styles for this page if needed #}
+    <style>
+        /* Basic styles for modal transition */
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+{% endblock extra_head %}
+
+{% block content %}
+    <div id="owner-app" class="px-4 py-8">
+        {% csrf_token %}
+
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold">Owners</h1>
+                <button @click="openCreateModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Add New Owner
+                </button>
+            </div>
+
+            {# --- Filter Controls --- #}
+            <div class="mb-4">
+                 {# Button to toggle filter visibility #}
+                 <button @click="toggleFilters" class="text-sm text-indigo-600 hover:text-indigo-800 mb-2">
+                     [[ showFilters ? 'Hide Filters' : 'Show Filters' ]] [[ showFilters ? '&#x25B2;' : '&#x25BC;' ]]
+                 </button>
+
+                 {# Filter Section - Conditionally rendered #}
+                 <transition name="fade"> {# Optional: Add transition #}
+                 <div v-if="showFilters" class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-3">
+                    <div class="flex items-center space-x-4">
+                        <label for="search-query" class="text-sm font-medium text-gray-700">Search:</label> {# Changed text #}
+                        <input type="text" id="search-query" v-model.lazy="searchQuery" @keyup.enter="applyFilters"
+                               placeholder="Enter search term..."
+                               class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                        <button @click="applyFilters" class="text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-3 rounded">Apply</button>
+                        <button @click="clearFilters" v-if="searchQuery || selectedFilterFields.length !== filterFields.length" class="text-sm text-gray-600 hover:text-gray-900">Clear</button>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-wrap">
+                        <span class="text-sm font-medium text-gray-700 mr-2">In fields:</span>
+                        <label v-for="field in filterFields" :key="field.value" class="inline-flex items-center mr-3 text-sm">
+                            <input type="checkbox" :value="field.value" v-model="selectedFilterFields" @change="applyFilters"
+                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50">
+                            <span class="ml-1.5 text-gray-700">[[ field.label ]]</span>
+                        </label>
+                    </div>
+                </div>
+                </transition>
+             </div>
+            {# --- End Filter Controls --- #}
+
+            {# --- Per Page Selector --- #}
+            <div class="mb-4 flex justify-start items-center">
+                 <label for="per-page" class="text-sm font-medium text-gray-700 mr-2">Show:</label>
+                 <select id="per-page" v-model.number="perPage" @change="changePerPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                     <option value="10">10</option>
+                     <option value="20">20</option>
+                     <option value="50">50</option>
+                     <option value="100">100</option>
+                 </select>
+                 <span class="text-sm text-gray-600 ml-4">([[ totalOwners ]] total owners)</span>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div v-if="isLoading" class="text-center py-10">
+                <p class="text-gray-500">Loading owners...</p>
+                {# Optional: Add a spinner SVG or similar #}
+            </div>
+
+            <!-- Owners Table -->
+            <div v-else class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telephone</th>
+                            <th scope="col" class="relative px-6 py-3">
+                                <span class="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="owners.length === 0 && !isLoading">
+                             <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No owners found.</td>
+                         </tr>
+                        <tr v-for="owner in owners" :key="owner.id">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {# Make name clickable #}
+                                <span @click="openViewModal(owner)" class="cursor-pointer hover:text-blue-600">
+                                    [[ owner.first_name ]] [[ owner.last_name ]]
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ owner.email || '' ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ owner.telephone || '' ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button @click="openViewModal(owner)" class="text-gray-600 hover:text-gray-900 mr-3">View</button>
+                                <button @click="openEditModal(owner)" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                                <button @click="openDeleteModal(owner)" class="text-red-600 hover:text-red-900">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {# --- Pagination Controls --- #}
+            <nav v-if="totalPages > 1 && !isLoading" class="mt-6 flex items-center justify-between border-t border-gray-200 px-4 sm:px-0">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button @click="goToPage(currentPage - 1)" :disabled="!hasPreviousPage" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Previous
+                    </button>
+                    <button @click="goToPage(currentPage + 1)" :disabled="!hasNextPage" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing
+                            <span class="font-medium">[[ firstOwnerIndex ]]</span>
+                            to
+                            <span class="font-medium">[[ lastOwnerIndex ]]</span>
+                            of
+                            <span class="font-medium">[[ totalOwners ]]</span>
+                            results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button @click="goToPage(currentPage - 1)" :disabled="!hasPreviousPage"
+                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="sr-only">Previous</span>
+                                &lt;
+                            </button>
+                            {# Consider adding page number links here if desired #}
+                            <button @click="goToPage(currentPage + 1)" :disabled="!hasNextPage"
+                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="sr-only">Next</span>
+                                &gt;
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </nav>
+
+        </div> {# End max-w-7xl wrapper #}
+
+        <!-- == Modals == -->
+
+        <!-- Create/Edit Modal -->
+        <transition name="fade">
+        <div v-if="showCreateEditModal" ref="createEditModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none" >
+            <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">[[ modalTitle ]]</h3>
+                    <form @submit.prevent="saveOwner" class="space-y-4 text-left">
+                        <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">[[ formErrors.non_field_errors.join(', ') ]]</div>
+                        <div>
+                            <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name *</label>
+                            <input type="text" v-model="ownerForm.last_name" id="last_name" required
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.last_name, 'border-gray-300': !formErrors.last_name}">
+                            <p v-if="formErrors.last_name" class="mt-1 text-xs text-red-500">[[ formErrors.last_name.join(', ') ]]</p>
+                        </div>
+                        <div>
+                            <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                            <input type="text" v-model="ownerForm.first_name" id="first_name"
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.first_name, 'border-gray-300': !formErrors.first_name}">
+                             <p v-if="formErrors.first_name" class="mt-1 text-xs text-red-500">[[ formErrors.first_name.join(', ') ]]</p>
+                        </div>
+                         <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" v-model="ownerForm.email" id="email"
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.email, 'border-gray-300': !formErrors.email}">
+                            <p v-if="formErrors.email" class="mt-1 text-xs text-red-500">[[ formErrors.email.join(', ') ]]</p>
+                        </div>
+                        <div>
+                            <label for="telephone" class="block text-sm font-medium text-gray-700">Telephone</label>
+                            <input type="tel" v-model="ownerForm.telephone" id="telephone"
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.telephone, 'border-gray-300': !formErrors.telephone}">
+                             <p v-if="formErrors.telephone" class="mt-1 text-xs text-red-500">[[ formErrors.telephone.join(', ') ]]</p>
+                        </div>
+                        <div>
+                            <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
+                            <textarea v-model="ownerForm.address" id="address" rows="3"
+                                      class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                      :class="{'border-red-500': formErrors.address, 'border-gray-300': !formErrors.address}"></textarea>
+                            <p v-if="formErrors.address" class="mt-1 text-xs text-red-500">[[ formErrors.address.join(', ') ]]</p>
+                        </div>
+                         <div>
+                            <label for="comments" class="block text-sm font-medium text-gray-700">Comments</label>
+                            <textarea v-model="ownerForm.comments" id="comments" rows="3"
+                                      class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                      :class="{'border-red-500': formErrors.comments, 'border-gray-300': !formErrors.comments}"></textarea>
+                            <p v-if="formErrors.comments" class="mt-1 text-xs text-red-500">[[ formErrors.comments.join(', ') ]]</p>
+                        </div>
+
+                        <div class="items-center px-4 py-3">
+                            <button type="submit" :disabled="isSaving"
+                                    class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50">
+                                [[ isSaving ? 'Saving...' : 'Save' ]]
+                            </button>
+                            <button type="button" @click="closeModal"
+                                    class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+        <!-- Delete Confirmation Modal -->
+        <transition name="fade">
+        <div v-if="showDeleteModal" ref="deleteModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
+             <div @click.stop class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Delete Owner</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">Are you sure you want to delete owner "[[ currentOwner.first_name ]] [[ currentOwner.last_name ]]"?</p>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                         <button @click="deleteOwnerConfirm" :disabled="isDeleting"
+                                class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-50">
+                            [[ isDeleting ? 'Deleting...' : 'Delete' ]]
+                        </button>
+                        <button @click="closeModal"
+                                class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+        <!-- View Details Modal -->
+        <transition name="fade">
+        <div v-if="showViewModal && currentOwner" ref="viewModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
+            <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 text-center mb-4">Owner Details</h3>
+                    <div class="space-y-3 text-left px-4">
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Name:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentOwner.first_name ]] [[ currentOwner.last_name ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Email:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentOwner.email || '-' ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Telephone:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentOwner.telephone || '-' ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Address:</strong>
+                            <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">[[ currentOwner.address || '-' ]]</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Comments:</strong>
+                            <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">[[ currentOwner.comments || '-' ]]</p>
+                        </div>
+                    </div>
+                    <div class="items-center px-4 py-3 mt-4 text-right border-t border-gray-200">
+                         <button @click="openEditFromViewModal"
+                                class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            Edit
+                        </button>
+                        <button @click="closeModal"
+                                class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+    </div>
+
+    {# Embed Django data as JSON safely #}
+    {{ owners_json|json_script:"owner-data" }}
+{% endblock content %}
+
+{% block scripts %}
+    <!-- Include Vue.js from CDN -->
+    <script src="https://unpkg.com/vue@3"></script>
+
+    <!-- Vue App Initialization -->
+    <script>
+        const ownerApp = Vue.createApp({
+            data() {
+                return {
+                    owners: [],
+                    isLoading: true,
+                    currentPage: 1,
+                    perPage: 20,
+                    totalPages: 0,
+                    totalOwners: 0,
+                    hasPreviousPage: false,
+                    hasNextPage: false,
+                    // Filter State
+                    searchQuery: '',
+                    filterFields: [
+                        { label: 'Last Name', value: 'last_name' },
+                        { label: 'First Name', value: 'first_name' },
+                        { label: 'Email', value: 'email' },
+                        { label: 'Telephone', value: 'telephone' },
+                        { label: 'Address', value: 'address' },
+                        { label: 'Comments', value: 'comments' },
+                    ],
+                    selectedFilterFields: [],
+                    // Modal State
+                    isSaving: false,
+                    isDeleting: false,
+                    showCreateEditModal: false,
+                    showDeleteModal: false,
+                    showViewModal: false,
+                    modalMode: 'create',
+                    currentOwner: null,
+                    ownerForm: {
+                        id: null,
+                        last_name: '',
+                        first_name: '',
+                        email: '',
+                        telephone: '',
+                        address: '',
+                        comments: ''
+                    },
+                    formErrors: {},
+                    csrfToken: '',
+                    showFilters: false,
+                }
+            },
+            delimiters: ['[[', ']]'],
+            computed: {
+                modalTitle() {
+                    return this.modalMode === 'create' ? 'Add New Owner' : 'Edit Owner';
+                },
+                // Computed properties for pagination display
+                firstOwnerIndex() {
+                    if (this.totalOwners === 0) return 0;
+                    return (this.currentPage - 1) * this.perPage + 1;
+                },
+                lastOwnerIndex() {
+                    const last = this.currentPage * this.perPage;
+                    return last > this.totalOwners ? this.totalOwners : last;
+                }
+            },
+            mounted() {
+                this.csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                this.selectedFilterFields = this.filterFields.map(f => f.value); // Select all by default
+                this.fetchPaginatedOwners();
+            },
+            methods: {
+                async fetchPaginatedOwners() {
+                    this.isLoading = true;
+                    let url = `{% url 'owner-list-api' %}?page=${this.currentPage}&per_page=${this.perPage}`;
+                    if (this.searchQuery.trim()) {
+                        url += `&query=${encodeURIComponent(this.searchQuery.trim())}`;
+                    }
+                    // Only add filter_fields if not all are selected
+                    if (this.selectedFilterFields.length < this.filterFields.length) {
+                        this.selectedFilterFields.forEach(field => {
+                            url += `&filter_fields=${encodeURIComponent(field)}`;
+                        });
+                    }
+                    // If all selected, don't send the param - backend will use default
+
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.json();
+                        if (data.success) {
+                            this.owners = data.results;
+                            this.currentPage = data.page;
+                            this.perPage = data.per_page;
+                            this.totalPages = data.total_pages;
+                            this.totalOwners = data.total_owners;
+                            this.hasPreviousPage = data.has_previous;
+                            this.hasNextPage = data.has_next;
+                        } else {
+                            console.error("API Error:", data.error);
+                        }
+                    } catch (error) {
+                        console.error("Failed to fetch owners:", error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                applyFilters() {
+                    this.currentPage = 1;
+                    this.fetchPaginatedOwners();
+                },
+                clearFilters() {
+                    this.searchQuery = '';
+                    this.selectedFilterFields = this.filterFields.map(f => f.value);
+                    this.applyFilters();
+                },
+                goToPage(pageNumber) {
+                    if (pageNumber >= 1 && pageNumber <= this.totalPages && pageNumber !== this.currentPage) {
+                        this.currentPage = pageNumber;
+                        this.fetchPaginatedOwners();
+                    }
+                },
+                changePerPage() {
+                    this.currentPage = 1; // Reset to first page when changing items per page
+                    this.fetchPaginatedOwners();
+                },
+                resetForm() {
+                    this.ownerForm = {
+                        id: null, last_name: '', first_name: '', email: '', telephone: '', address: '', comments: ''
+                    };
+                    this.formErrors = {};
+                    this.currentOwner = null;
+                },
+                openCreateModal() {
+                    this.resetForm();
+                    this.modalMode = 'create';
+                    this.showCreateEditModal = true;
+                    // Set focus after DOM update
+                    this.$nextTick(() => { this.$refs.createEditModal?.focus(); });
+                },
+                openEditModal(owner) {
+                    this.resetForm();
+                    this.modalMode = 'edit';
+                    this.currentOwner = { ...owner };
+                    this.ownerForm = { ...this.currentOwner };
+                    this.showCreateEditModal = true;
+                    // Set focus after DOM update
+                    this.$nextTick(() => { this.$refs.createEditModal?.focus(); });
+                },
+                openDeleteModal(owner) {
+                    this.resetForm();
+                    this.currentOwner = { ...owner };
+                    this.showDeleteModal = true;
+                    // Set focus after DOM update
+                    this.$nextTick(() => { this.$refs.deleteModal?.focus(); });
+                },
+                openViewModal(owner) {
+                    this.resetForm();
+                    this.currentOwner = { ...owner };
+                    this.showViewModal = true;
+                    // Set focus after DOM update
+                    this.$nextTick(() => { this.$refs.viewModal?.focus(); });
+                },
+                closeModal() {
+                    this.showCreateEditModal = false;
+                    this.showDeleteModal = false;
+                    this.showViewModal = false;
+                    this.resetForm();
+                },
+                openEditFromViewModal() {
+                    // Keep owner data, just switch modals
+                    const ownerToEdit = { ...this.currentOwner };
+                    this.closeModal(); // Close view modal first
+                    // Need slight delay or use nextTick again if closeModal affects DOM immediately
+                    this.$nextTick(() => {
+                        this.openEditModal(ownerToEdit); // Open edit modal, which will set focus
+                    });
+                },
+                async saveOwner() {
+                    this.isSaving = true;
+                    this.formErrors = {};
+                    const url = this.modalMode === 'create'
+                        ? '{% url "owner-create" %}'
+                        : `/api/owners/${this.currentOwner.id}/update/`;
+                    const method = 'POST';
+
+                    try {
+                        const response = await fetch(url, {
+                            method: method,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': this.csrfToken
+                            },
+                            body: JSON.stringify(this.ownerForm)
+                        });
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Refresh the current page data after save
+                            this.fetchPaginatedOwners();
+                            this.closeModal();
+                        } else if (response.status === 400 && !data.success) {
+                            this.formErrors = data.errors;
+                            console.error('Validation errors:', data.errors);
+                        } else {
+                            console.error('Error saving owner:', data.error || 'Unknown error');
+                            this.formErrors = {'non_field_errors': [data.error || 'An unknown error occurred.']};
+                        }
+                    } catch (error) {
+                        console.error('Network error saving owner:', error);
+                        this.formErrors = {'non_field_errors': ['A network error occurred. Please try again.']};
+                    } finally {
+                        this.isSaving = false;
+                    }
+                },
+                 async deleteOwnerConfirm() {
+                    if (!this.currentOwner) return;
+                    this.isDeleting = true;
+                    const url = `/api/owners/${this.currentOwner.id}/delete/`;
+
+                     try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': this.csrfToken
+                            }
+                        });
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Refresh the current page data after delete
+                            // Might need to adjust currentPage if it becomes empty
+                            if (this.owners.length === 1 && this.currentPage > 1) {
+                                this.currentPage--;
+                            }
+                            this.fetchPaginatedOwners();
+                            this.closeModal();
+                        } else {
+                            console.error('Error deleting owner:', data.error || 'Unknown error');
+                            // Show error?
+                        }
+                    } catch (error) {
+                        console.error('Network error deleting owner:', error);
+                         // Show error?
+                    } finally {
+                        this.isDeleting = false;
+                    }
+                },
+                toggleFilters() {
+                    this.showFilters = !this.showFilters;
+                },
+            }
+        });
+        ownerApp.mount('#owner-app');
+    </script>
+{% endblock scripts %} 

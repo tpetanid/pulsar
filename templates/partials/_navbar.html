@@ -1,0 +1,33 @@
+<nav class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+            <div class="flex-shrink-0 flex items-center">
+                <a href="{% url 'home' %}" class="text-xl font-bold text-blue-600">Vet Cardio App</a>
+            </div>
+            <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                {# Determine active link based on request path #}
+                {% url 'home' as home_url %}
+                {% url 'owner-list' as owner_list_url %}
+                {# Add other top-level URLs here if needed #}
+                {% url 'manage' as manage_url %}
+
+                {# Placeholder link - Add URL when Patients page exists #}
+                <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    Patients
+                </a>
+                <a href="{{ owner_list_url }}"
+                   class="{% if request.path == owner_list_url %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    Owners
+                </a>
+                 {# Placeholder link - Add URL when Examinations page exists #}
+                <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    Examinations
+                </a>
+                <a href="{{ manage_url }}"
+                   class="{% if request.path == manage_url %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    Manage
+                </a>
+            </div>
+        </div>
+    </div>
+</nav> 

@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Vet Cardio App{% endblock title %}</title>
+    <link href="{% static 'css/output.css' %}" rel="stylesheet">
+    {% block extra_head %}{% endblock extra_head %}
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+
+    {# Include the navbar #}
+    {% include "partials/_navbar.html" %}
+
+    {# Main content block for child templates #}
+    <main class="flex-grow">
+        {% block content %}
+        {# Page specific content goes here #}
+        {% endblock content %}
+    </main>
+
+    {# Include the footer #}
+    {% include "partials/_footer.html" %}
+
+    {# Block for page-specific scripts #}
+    {% block scripts %}{% endblock scripts %}
+
+</body>
+</html> 

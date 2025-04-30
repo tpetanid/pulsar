@@ -25,68 +25,96 @@
 
         {# --- Notification Area (Moved and Restyled) --- #}
         <transition name="fade">
-            <div v-if="notificationVisible" :key="notificationMessage + notificationType" {# Key helps reset transition #}
+            <div v-if="notification.message" :key="notification.message + notification.type" {# Key helps reset transition #}
                  class="w-full p-4 mb-6 rounded-md shadow-md border" {# Removed fixed positioning, added mb-6 #}
-                 :class="notificationType === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'"
+                 :class="notification.type === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 'bg-red-100 border-red-400 text-red-800'"
                  role="alert">
                  {# Display message directly #}
-                 <p>[[ notificationMessage ]]</p>
+                 <p>[[ notification.message ]]</p>
                  {# Optional: Add a close button if desired #}
                  {# <button @click="notificationVisible = false" class="absolute top-2 right-2 text-lg font-semibold">&times;</button> #}
             </div>
         </transition>
         {# --- End Notification Area --- #}
 
-        <div class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 sm:gap-x-6 lg:gap-x-8">
+        {# --- Section 1: Bulk Operations --- #}
+        <div class="mb-10 p-6 bg-white shadow-md rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-700 mb-5">Execute Bulk Operations</h2>
+            <div class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 sm:gap-x-6 lg:gap-x-8">
+                {# Card 1: Import Owners #}
+                <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-teal-600">Import Owners</h3>
+                        <p class="mt-2 text-sm text-gray-500">Bulk import owner data from a CSV file.</p>
+                        <button @click="openImportModal" class="mt-3 text-sm font-medium text-white bg-teal-500 hover:bg-teal-600 py-1 px-3 rounded">
+                            Import Owners
+                        </button>
+                    </div>
+                </div>
 
-            <!-- Card 1: Import Owners -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
-                <div class="p-5">
-                    <h3 class="text-lg leading-6 font-medium text-teal-600">Import Owners</h3>
-                    <p class="mt-2 text-sm text-gray-500">Bulk import owner data from a CSV file.</p>
-                    <button @click="openImportModal('owner')" class="mt-3 text-sm font-medium text-white bg-teal-500 hover:bg-teal-600 py-1 px-3 rounded">
-                        Import Owners
-                    </button>
+                {# Card 2: Export Owners #}
+                <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-sky-600">Export Owners</h3>
+                        <p class="mt-2 text-sm text-gray-500">Export all owner data to a file.</p>
+                        <a href="#" class="mt-3 text-sm font-medium text-sky-500 hover:text-sky-600"> Go to Export &rarr; </a> {# Placeholder link #}
+                    </div>
+                </div>
+
+                {# Card 3: Import Patients #}
+                <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-lime-600">Import Patients</h3>
+                        <p class="mt-2 text-sm text-gray-500">Bulk import patient data from a file.</p>
+                         <button @click="openImportModal" disabled class="mt-3 text-sm font-medium text-white bg-lime-500 hover:bg-lime-600 py-1 px-3 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+                            Import Patients (WIP)
+                        </button>
+                    </div>
+                </div>
+
+                 {# Card 4: Export Patients #}
+                 <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-cyan-600">Export Patients</h3>
+                        <p class="mt-2 text-sm text-gray-500">Export all patient data to a file.</p>
+                        <a href="#" class="mt-3 text-sm font-medium text-cyan-500 hover:text-cyan-600"> Go to Export &rarr; </a> {# Placeholder link #}
+                    </div>
                 </div>
             </div>
-
-            <!-- Card 2: Export Owners -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
-                <div class="p-5">
-                    <h3 class="text-lg leading-6 font-medium text-sky-600">Export Owners</h3>
-                    <p class="mt-2 text-sm text-gray-500">Export all owner data to a file.</p>
-                    <a href="#" class="mt-3 text-sm font-medium text-sky-500 hover:text-sky-600"> Go to Export &rarr; </a> {# Placeholder link #}
-                </div>
-            </div>
-
-            <!-- Card 3: Import Patients -->
-            <div class="bg-white overflow-hidden shadow rounded-lg">
-                <div class="p-5">
-                    <h3 class="text-lg leading-6 font-medium text-lime-600">Import Patients</h3>
-                    <p class="mt-2 text-sm text-gray-500">Bulk import patient data from a file.</p>
-                    <button @click="openImportModal('patient')" disabled class="mt-3 text-sm font-medium text-white bg-lime-500 hover:bg-lime-600 py-1 px-3 rounded disabled:opacity-50 disabled:cursor-not-allowed">
-                        Import Patients (WIP)
-                    </button>
-                </div>
-            </div>
-
-             <!-- Card 4: Export Patients -->
-             <div class="bg-white overflow-hidden shadow rounded-lg">
-                <div class="p-5">
-                    <h3 class="text-lg leading-6 font-medium text-cyan-600">Export Patients</h3>
-                    <p class="mt-2 text-sm text-gray-500">Export all patient data to a file.</p>
-                    <a href="#" class="mt-3 text-sm font-medium text-cyan-500 hover:text-cyan-600"> Go to Export &rarr; </a> {# Placeholder link #}
-                </div>
-            </div>
-
         </div>
+        {# --- End Section 1 --- #}
+
+        {# --- Section 2: Default Values --- #}
+        <div class="mb-10 p-6 bg-white shadow-md rounded-lg border border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-700 mb-5">Manage Reference Data</h2>
+             <div class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 sm:gap-x-6 lg:gap-x-8">
+                {# Card 5: Manage Species #}
+                 <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-purple-600">Species</h3>
+                        <p class="mt-2 text-sm text-gray-500">Add, view, or remove animal species codes.</p>
+                        <button @click="openSpeciesModal" class="mt-3 text-sm font-medium text-purple-500 hover:text-purple-600"> Manage Species &rarr; </button>
+                    </div>
+                </div>
+
+                 {# Card 6: Manage Breeds - Enabled #}
+                 <div class="bg-gray-50 border border-gray-200 overflow-hidden shadow rounded-lg">
+                     <div class="p-5">
+                        <h3 class="text-lg leading-6 font-medium text-orange-600">Breeds</h3>
+                        <p class="mt-2 text-sm text-gray-500">Manage breeds associated with each species.</p>
+                        <button @click="openBreedsModal" class="mt-3 text-sm font-medium text-orange-500 hover:text-orange-600"> Manage Breeds &rarr; </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+         {# --- End Section 2 --- #}
 
         <!-- == Import Modal == -->
         <transition name="fade">
-            <div v-if="showImportModal" ref="importModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+            <div v-if="isImportModalOpen" ref="importModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
                 class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
                 <div @click.stop class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 text-center mb-4">Import [[ importType === 'owner' ? 'Owners' : 'Patients' ]]</h3>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 text-center mb-4">Import Owners</h3>
 
                     <div class="space-y-4 px-4">
                         <p class="text-sm text-gray-600">Upload a CSV file to bulk import data. Please ensure your file matches the required format.</p>
@@ -116,22 +144,25 @@
                         </div>
 
                         <!-- Validation Errors -->
-                        <div v-if="validationError" class="mt-2 text-sm text-red-600 bg-red-100 p-3 rounded">
-                            <p><strong>Error:</strong> [[ validationError ]]</p>
+                        <div v-if="validationErrors.length > 0" class="mt-2 text-sm text-red-600 bg-red-100 p-3 rounded">
+                            <p><strong>Errors:</strong></p>
+                            <ul>
+                                <li v-for="error in validationErrors" :key="error">{{ error }}</li>
+                            </ul>
                         </div>
 
                          <!-- Preview Section -->
-                        <div v-if="previewData.headers.length > 0">
-                            <h4 class="text-md font-medium text-gray-800 mb-2">File Preview (Showing first [[ previewData.rows.length ]] of [[ totalCsvRecords ]] total records):</h4>
+                        <div v-if="previewData.length > 0">
+                            <h4 class="text-md font-medium text-gray-800 mb-2">File Preview (Showing first [[ previewData.length ]] of [[ totalRecords ]] total records):</h4>
                             <div class="overflow-x-auto max-h-60 border border-gray-200 rounded">
                                 <table class="min-w-full divide-y divide-gray-200 text-xs">
                                     <thead class="bg-gray-50 sticky top-0">
                                         <tr>
-                                            <th v-for="header in previewData.headers" :key="header" scope="col" class="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">[[ header ]]</th>
+                                            <th v-for="header in previewHeaders" :key="header" scope="col" class="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">[[ header ]]</th>
                                         </tr>
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
-                                        <tr v-for="(row, index) in previewData.rows" :key="index">
+                                        <tr v-for="(row, index) in previewData" :key="index">
                                             <td v-for="(cell, cellIndex) in row" :key="cellIndex" class="px-4 py-2 whitespace-nowrap">[[ cell ]]</td>
                                         </tr>
                                     </tbody>
@@ -142,9 +173,9 @@
                     </div>
 
                     <div class="items-center px-4 py-3 mt-4 text-right border-t border-gray-200">
-                         <button @click="confirmImport" :disabled="!canImport || isImporting"
+                         <button @click="confirmImport" :disabled="!canImport || isProcessingImport"
                                 class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                            [[ isImporting ? 'Importing...' : 'Import Data' ]]
+                            [[ isProcessingImport ? 'Importing...' : 'Import Data' ]]
                         </button>
                         <button @click="closeModal"
                                 class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
@@ -154,203 +185,642 @@
                 </div>
             </div>
         </transition>
+
+        <!-- Species Management Modal -->
+        <div v-if="isSpeciesModalOpen" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50" @click.self="closeSpeciesModal" @keydown.escape.prevent="closeSpeciesModal">
+            <div class="relative bg-white rounded-lg shadow-xl p-8 m-4 max-w-xl w-full" role="dialog" aria-modal="true" aria-labelledby="speciesModalTitle">
+                <h3 id="speciesModalTitle" class="text-2xl font-semibold text-gray-800 mb-4">Manage Species</h3>
+                <p class="text-gray-600 mb-6">View, add, or delete species codes used throughout the application. Codes should be short, uppercase identifiers (e.g., DOG, CAT, BIRD).</p>
+
+                <!-- Add New Species -->
+                <div class="mb-6 border-b pb-6">
+                    <h4 class="text-lg font-medium text-gray-700 mb-3">Add New Species</h4>
+                    <div class="flex items-center space-x-3">
+                        <input type="text" v-model.trim="newSpeciesCode" @keyup.enter="addSpecies" placeholder="New Species Code (e.g., BIRD)" 
+                               ref="newSpeciesInput" 
+                               class="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                        <button @click="addSpecies" :disabled="!newSpeciesCode || speciesLoading" 
+                                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Add
+                        </button>
+                    </div>
+                     <p v-if="speciesError" class="text-red-600 text-sm mt-2">[[ speciesError ]]</p>
+                </div>
+
+                <!-- Existing Species List -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-700 mb-3">Existing Species</h4>
+                    <div v-if="speciesLoading && !speciesList.length" class="text-center text-gray-500">Loading...</div>
+                    <div v-else-if="!speciesLoading && !speciesList.length" class="text-center text-gray-500">No species found.</div>
+                    <ul v-else class="max-h-60 overflow-y-auto border rounded-md divide-y divide-gray-200">
+                        <li v-for="species in speciesList" :key="species.code" class="px-4 py-3 flex justify-between items-center">
+                            <span class="text-gray-800 font-medium">[[ species.code ]]</span>
+                            <button @click="deleteSpecies(species.code)" :disabled="speciesLoading" 
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                Delete
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end">
+                    <button @click="closeSpeciesModal" type="button" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Breed Management Modal -->
+        <div v-if="isBreedsModalOpen" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50" @click.self="closeBreedsModal" @keydown.escape.prevent="closeBreedsModal">
+            <div class="relative bg-white rounded-lg shadow-xl p-8 m-4 max-w-2xl w-full" role="dialog" aria-modal="true" aria-labelledby="breedsModalTitle">
+                <h3 id="breedsModalTitle" class="text-2xl font-semibold text-gray-800 mb-4">Manage Breeds</h3>
+                
+                <!-- Species Selector -->
+                <div class="mb-4">
+                    <label for="breed-species-select" class="block text-sm font-medium text-gray-700">Select Species:</label>
+                    <select id="breed-species-select" v-model="selectedBreedSpecies" @change="handleSpeciesChange" 
+                            class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option v-if="speciesLoading" value="" disabled>Loading species...</option>
+                        <option v-for="species in speciesList" :key="species.code" :value="species.code">[[ species.code ]]</option>
+                    </select>
+                </div>
+
+                 <!-- Add New Breed -->
+                 <div class="mb-4 border-t pt-4">
+                    <h4 class="text-lg font-medium text-gray-700 mb-3">Add New Breed for [[ selectedBreedSpecies || 'Selected Species' ]]</h4>
+                    <div class="flex items-center space-x-3">
+                        <input type="text" v-model.trim="newBreedName" @keyup.enter="addBreed" placeholder="New Breed Name" 
+                               ref="newBreedInput"
+                               class="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                        <button @click="addBreed" :disabled="!newBreedName || breedsLoading || !selectedBreedSpecies" 
+                                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Add
+                        </button>
+                    </div>
+                     <p v-if="breedError" class="text-red-600 text-sm mt-2">[[ breedError ]]</p>
+                </div>
+
+                <!-- Existing Breeds List & Search -->
+                <div class="border-t pt-4">
+                    <div class="flex justify-between items-center mb-3">
+                         <h4 class="text-lg font-medium text-gray-700">Existing Breeds ([[ breedsPagination.total_breeds !== undefined ? breedsPagination.total_breeds : 'N/A' ]] found)</h4>
+                         {# Search input and buttons #}
+                         <div class="flex items-center space-x-2 w-1/2">
+                             <input type="search" v-model="breedSearchQuery" @keyup.enter="applyBreedSearch" placeholder="Search breeds..." 
+                                    class="px-3 py-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"> 
+                             <button @click="applyBreedSearch" :disabled="breedsLoading" 
+                                     class="px-3 py-1 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+                                 Apply
+                             </button>
+                             <button @click="clearBreedSearch" 
+                                     :disabled="breedsLoading || (!breedSearchQuery && !isBreedFilterActive)"
+                                     class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50">
+                                 Clear
+                             </button>
+                         </div>
+                    </div>
+
+                    <div v-if="breedsLoading && !breedsList.length" class="text-center text-gray-500 py-4">Loading breeds...</div>
+                    <div v-else-if="!breedsLoading && !breedsList.length && selectedBreedSpecies" class="text-center text-gray-500 py-4">No breeds found for [[ selectedBreedSpecies ]]<span v-if="breedSearchQuery"> matching "[[ breedSearchQuery ]]"</span>.</div>
+                     <div v-else-if="!selectedBreedSpecies" class="text-center text-gray-500 py-4">Please select a species first.</div>
+                    <ul v-else class="max-h-72 overflow-y-auto border rounded-md divide-y divide-gray-200 mb-4">
+                        <li v-for="breed in breedsList" :key="breed.id" class="px-4 py-3 flex justify-between items-center">
+                            <span class="text-gray-800">[[ breed.name ]]</span>
+                            <button @click="deleteBreed(breed.id, breed.name)" :disabled="breedsLoading" 
+                                    class="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                Delete
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Pagination Controls for Breeds -->
+                     <div v-if="breedsPagination.total_pages > 1" class="flex items-center justify-between text-sm text-gray-600">
+                        <button @click="goToBreedPage(breedsPagination.page - 1)" 
+                                :disabled="!breedsPagination.has_previous || breedsLoading"
+                                class="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+                        <span>Page [[ breedsPagination.page ]] of [[ breedsPagination.total_pages ]]</span>
+                        <button @click="goToBreedPage(breedsPagination.page + 1)" 
+                                :disabled="!breedsPagination.has_next || breedsLoading"
+                                class="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end">
+                    <button @click="closeBreedsModal" type="button" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock content %}
 
 {% block scripts %}
-<script src="https://unpkg.com/vue@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
     const manageApp = Vue.createApp({
         data() {
             return {
-                showImportModal: false,
-                importType: null, // 'owner' or 'patient'
-                fileToImport: null,
-                validationError: null,
-                previewData: { headers: [], rows: [] },
-                totalCsvRecords: 0,
-                canImport: false,
-                isImporting: false,
-                csrfToken: '',
-                // Notification state
-                notificationVisible: false,
-                notificationMessage: '',
-                notificationType: 'success', // 'success' or 'error'
-                notificationTimeout: null, // To store setTimeout ID
-                // Define fields for display
-                ownerFields: [
-                    { name: 'last_name', type: 'Text', required: true },
-                    { name: 'first_name', type: 'Text', required: false },
-                    { name: 'email', type: 'Email', required: false },
-                    { name: 'telephone', type: 'Text', required: false },
-                    { name: 'address', type: 'Text', required: false },
-                    { name: 'comments', type: 'Text', required: false },
-                    { name: 'created_at', type: 'DateTime (YYYY-MM-DD HH:MM:SS)', required: false },
-                ],
-                patientFields: [ /* Add when patient model exists */ ],
-            }
+                // Import Modal State
+                isImportModalOpen: false,
+                importFile: null,
+                validationErrors: [],
+                previewData: [],
+                totalRecords: 0,
+                previewHeaders: [],
+                isProcessingImport: false,
+                importSuccess: null,
+                importMessage: '',
+                importedCount: 0,
+                skippedCount: 0,
+                skippedRowsInfo: [],
+
+                // Notification State
+                notification: {
+                    message: null,
+                    type: 'success',
+                    timeoutId: null // To clear timeout if new notification comes
+                },
+
+                // Species Modal State
+                isSpeciesModalOpen: false,
+                speciesList: [], // Holds {code: '... '}
+                newSpeciesCode: '',
+                speciesLoading: false,
+                speciesError: null,
+
+                // Breed Modal State
+                isBreedsModalOpen: false,
+                selectedBreedSpecies: '',
+                newBreedName: '',
+                breedsLoading: false,
+                breedError: null,
+                breedsList: [],
+                breedSearchQuery: '',
+                isBreedFilterActive: false,
+                breedSearchDebounceMs: 300,
+                breedsPagination: {
+                    total_breeds: 0,
+                    total_pages: 1,
+                    page: 1,
+                    per_page: 25,
+                    has_previous: false,
+                    has_next: false
+                }
+            };
         },
-        delimiters: [ '[[', ']]' ],
+        delimiters: ['[[', ']]'],
         computed: {
-            requiredFields() {
-                return this.importType === 'owner' ? this.ownerFields : this.patientFields;
-            },
             templateDownloadUrl() {
-                // We'll create this URL in Django later
-                return this.importType === 'owner' ? '{% url "owner-import-template" %}' : '#';
-            }
-        },
-        mounted() {
-            this.csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                return '{% url "owner-import-template" %}';
+            },
+            canImport() {
+                return this.importFile && this.validationErrors.length === 0 && !this.isProcessingImport;
+            },
+             requiredFields() {
+                 return [
+                     { name: 'last_name', type: 'Text', required: true },
+                     { name: 'first_name', type: 'Text', required: false },
+                     { name: 'email', type: 'Email', required: false },
+                     { name: 'telephone', type: 'Text', required: false },
+                     { name: 'address', type: 'Text', required: false },
+                     { name: 'comments', type: 'Text', required: false },
+                     { name: 'created_at', type: 'DateTime (YYYY-MM-DD HH:MM:SS)', required: false },
+                 ];
+            },
         },
         methods: {
-            resetImportState() {
-                this.fileToImport = null;
-                this.validationError = null;
-                this.previewData = { headers: [], rows: [] };
-                this.totalCsvRecords = 0;
-                this.canImport = false;
-                this.isImporting = false;
+            // --- Notification Methods ---
+            showNotification(message, type = 'success', duration = 5000) {
+                 this.notification.message = message;
+                 this.notification.type = type;
+                 // Clear previous timeout if exists before setting a new one
+                 if (this.notification.timeoutId) {
+                     clearTimeout(this.notification.timeoutId);
+                 }
+                 if (duration > 0) {
+                     this.notification.timeoutId = setTimeout(() => this.clearNotification(), duration);
+                 } else {
+                     this.notification.timeoutId = null; // No auto-clear for duration 0
+                 }
             },
-            openImportModal(type) {
-                this.resetImportState();
-                if (this.$refs.fileInput) {
-                    this.$refs.fileInput.value = '';
+            clearNotification() {
+                this.notification.message = null;
+                if (this.notification.timeoutId) {
+                    clearTimeout(this.notification.timeoutId);
+                    this.notification.timeoutId = null;
                 }
-                this.importType = type;
-                this.showImportModal = true;
-                this.$nextTick(() => { this.$refs.importModal?.focus(); });
             },
-            closeModal() {
-                this.showImportModal = false;
-                this.resetImportState();
-                if (this.$refs.fileInput) {
-                    this.$refs.fileInput.value = '';
-                }
+
+            // --- Owner Import Methods ---
+             openImportModal() {
+                this.isImportModalOpen = true;
+                this.importFile = null;
+                this.validationErrors = [];
+                this.previewData = [];
+                this.totalRecords = 0;
+                this.previewHeaders = [];
+                this.importSuccess = null;
+                this.importMessage = '';
+                this.importedCount = 0;
+                this.skippedCount = 0;
+                this.skippedRowsInfo = [];
+                this.clearNotification();
+                const fileInput = document.getElementById('file-upload');
+                if (fileInput) fileInput.value = '';
+                this.$nextTick(() => {
+                    const focusable = this.$el.querySelector('#file-upload, button');
+                    if (focusable) focusable.focus();
+                });
+            },
+            closeModal() { // Specific close method
+                this.isImportModalOpen = false;
             },
             handleFileChange(event) {
-                this.validationError = null;
-                this.previewData = { headers: [], rows: [] };
-                this.totalCsvRecords = 0;
-                this.canImport = false;
-
-                setTimeout(() => {
-                    const fileInput = this.$refs.fileInput;
-
-                    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                        this.fileToImport = null;
-                        return;
-                    }
-                    const file = fileInput.files[0];
-
-                    if (!file.name.toLowerCase().endsWith('.csv')) {
-                        this.validationError = 'Invalid file type. Please upload a .csv file.';
-                        this.fileToImport = null;
-                        return;
-                    }
-
-                    this.fileToImport = file;
-                    this.validateAndPreviewFile();
-                }, 0);
+                 const fileInput = event.target;
+                 this.importFile = fileInput.files[0];
+                 this.validationErrors = [];
+                 this.previewData = [];
+                 this.totalRecords = 0;
+                 this.previewHeaders = [];
+                 this.importSuccess = null;
+                 this.importMessage = '';
+                 this.clearNotification();
+                 if (this.importFile) {
+                     this.validateAndPreviewFile();
+                 } else {
+                    this.previewData = [];
+                    this.previewHeaders = [];
+                    this.totalRecords = 0;
+                 }
             },
-            async validateAndPreviewFile() {
-                if (!this.fileToImport) return;
-
-                const formData = new FormData();
-                formData.append('file', this.fileToImport);
-                formData.append('import_type', this.importType);
-
-                const previewUrl = '{% url "owner-import-preview" %}';
-
-                this.totalCsvRecords = 0;
-                try {
-                    const response = await fetch(previewUrl, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': this.csrfToken
-                        },
-                        body: formData
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok && data.success) {
-                        this.previewData = data.preview;
-                        this.totalCsvRecords = data.total_records || 0;
-                        this.canImport = true;
-                        this.validationError = null;
+            validateAndPreviewFile() {
+                if (!this.importFile) return;
+                if (this.importFile.type !== 'text/csv' && !this.importFile.name.toLowerCase().endsWith('.csv')) {
+                    this.validationErrors = ['Invalid file type. Please upload a CSV file.'];
+                    this.importFile = null;
+                    const fileInput = document.getElementById('file-upload');
+                    if(fileInput) fileInput.value = '';
+                    return;
+                }
+                this.isProcessingImport = true;
+                this.validationErrors = [];
+                this.previewData = [];
+                this.totalRecords = 0;
+                this.previewHeaders = [];
+                let formData = new FormData();
+                formData.append('file', this.importFile);
+                axios.post('{% url "owner-import-preview" %}', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(response => {
+                    // Check backend success flag AND expected data structure
+                    if (response.data.success && response.data.preview && response.data.preview.headers && response.data.preview.rows) {
+                        this.previewHeaders = response.data.preview.headers;
+                        this.previewData = response.data.preview.rows;
+                        this.totalRecords = response.data.total_records || 0; // Use total_records
                     } else {
-                        this.validationError = data.error || 'Failed to validate or preview file.';
-                        this.canImport = false;
-                        this.previewData = { headers: [], rows: [] };
-                        this.totalCsvRecords = 0;
+                         // Handle potential backend error structure differences
+                        this.validationErrors = response.data.errors || response.data.error ? (Array.isArray(response.data.errors) ? response.data.errors : [response.data.error || 'Preview failed.']) : ['Unknown preview error.'];
+                        this.importFile = null;
+                        const fileInput = document.getElementById('file-upload');
+                        if(fileInput) fileInput.value = '';
                     }
-                } catch (error) {
-                    console.error("Preview request failed:", error);
-                    this.validationError = 'An error occurred while processing the file.';
-                    this.canImport = false;
-                    this.previewData = { headers: [], rows: [] };
-                    this.totalCsvRecords = 0;
-                }
+                })
+                .catch(error => {
+                    console.error("Preview Error:", error);
+                    let msg = 'An unexpected error occurred during preview.';
+                    if (error.response && error.response.data && (error.response.data.error || error.response.data.errors)) {
+                         const backendError = error.response.data.error || (Array.isArray(error.response.data.errors) ? error.response.data.errors.join('; ') : 'Preview failed.');
+                         msg = `Preview Error: ${backendError}`;
+                    }
+                    this.validationErrors = [msg];
+                    this.importFile = null;
+                    const fileInput = document.getElementById('file-upload');
+                    if (fileInput) fileInput.value = '';
+                })
+                .finally(() => {
+                    this.isProcessingImport = false;
+                });
             },
-            showNotification(message, type = 'success') {
-                this.notificationMessage = message;
-                this.notificationType = type;
-                this.notificationVisible = true;
-
-                if (this.notificationTimeout) {
-                    clearTimeout(this.notificationTimeout);
-                }
-                this.notificationTimeout = setTimeout(() => {
-                    this.notificationVisible = false;
-                }, 6000);
-            },
-            async confirmImport() {
-                if (!this.canImport || !this.fileToImport) return;
-
-                this.isImporting = true;
-                this.validationError = null;
-
-                const formData = new FormData();
-                formData.append('file', this.fileToImport);
-                formData.append('import_type', this.importType);
-
-                const importUrl = '{% url "owner-import-execute" %}';
-
-                 try {
-                    const response = await fetch(importUrl, {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': this.csrfToken },
-                        body: formData
-                    });
-                    const data = await response.json();
-
-                    if (response.ok && data.success) {
-                        let message = `Successfully imported ${data.imported_count} new owners.`;
-                        if (data.skipped_count > 0) {
-                            message += ` Skipped ${data.skipped_count} duplicate owners.`;
-                        }
+            confirmImport() {
+                if (!this.canImport) return;
+                this.isProcessingImport = true;
+                this.importSuccess = null;
+                this.importMessage = '';
+                this.clearNotification();
+                let formData = new FormData();
+                formData.append('file', this.importFile);
+                axios.post('{% url "owner-import-execute" %}', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(response => {
+                    if (response.data.success) {
+                        this.importSuccess = true;
+                        this.importedCount = response.data.imported_count;
+                        this.skippedCount = response.data.skipped_count;
+                        // this.skippedRowsInfo = response.data.skipped_rows_info || []; // We're not displaying details currently
+                        let message = response.data.message || `Successfully imported ${this.importedCount} owners.`;
+                         if (response.data.skipped_count > 0 && !message.toLowerCase().includes('skipped')) { // Append if backend message didn't include it
+                             message += ` Skipped ${response.data.skipped_count} rows (duplicates/errors).`;
+                         }
                         this.showNotification(message, 'success');
                         this.closeModal();
                     } else {
-                        let errorMsg = data.error || 'An error occurred during import.';
-                        if (data.imported_count !== undefined && data.skipped_count !== undefined) {
-                             errorMsg = `Import finished with errors. Imported: ${data.imported_count}. Skipped: ${data.skipped_count}. Errors:\n${data.error}`;
-                        }
-                        this.validationError = data.error || 'Import failed.';
-                        this.showNotification(errorMsg, 'error');
+                        this.importSuccess = false;
+                         // Prefer specific errors if backend sends them
+                        let errorMsg = response.data.error || 'Import failed due to errors.';
+                         this.validationErrors = response.data.error ? [response.data.error] : (response.data.errors || ['Import failed.']); // Show errors in modal
+                         this.showNotification(errorMsg, 'error', 0);
                     }
-                } catch (error) {
-                     console.error("Import request failed:", error);
-                     const errorMsg = 'An error occurred connecting to the server during import.';
-                     this.validationError = errorMsg;
-                     this.showNotification(errorMsg, 'error');
-                } finally {
-                    this.isImporting = false;
+                })
+                .catch(error => {
+                    console.error("Import Execute Error:", error);
+                    this.importSuccess = false;
+                    let errorMsg = 'An unexpected error occurred during import.';
+                    if (error.response && error.response.data && (error.response.data.error || error.response.data.errors)) {
+                         errorMsg = error.response.data.error || (Array.isArray(error.response.data.errors) ? error.response.data.errors.join('; ') : 'Import failed.');
+                    }
+                    this.validationErrors = [errorMsg];
+                    this.showNotification(errorMsg, 'error', 0);
+                })
+                .finally(() => {
+                    this.isProcessingImport = false;
+                });
+            },
+
+            // --- Species Management Methods ---
+            openSpeciesModal() {
+                this.isSpeciesModalOpen = true;
+                this.newSpeciesCode = '';
+                this.speciesError = null;
+                this.clearNotification();
+                if (this.speciesList.length === 0) {
+                    this.fetchSpecies();
+                } else {
+                    this.speciesLoading = false;
+                }
+                this.$nextTick(() => {
+                    if (this.$refs.newSpeciesInput) this.$refs.newSpeciesInput.focus();
+                });
+            },
+            closeSpeciesModal() {
+                this.isSpeciesModalOpen = false;
+            },
+            fetchSpecies() {
+                this.speciesLoading = true;
+                this.speciesError = null;
+                axios.get('{% url "species-list-create" %}')
+                    .then(response => {
+                        this.speciesList = response.data.sort((a, b) => a.code.localeCompare(b.code));
+                    })
+                    .catch(error => {
+                        console.error("Error fetching species:", error);
+                        this.speciesError = "Failed to load species list.";
+                        this.showNotification("Failed to load species list.", 'error');
+                    })
+                    .finally(() => {
+                        this.speciesLoading = false;
+                    });
+            },
+            addSpecies() {
+                if (!this.newSpeciesCode || this.speciesLoading) return;
+                const codeToAdd = this.newSpeciesCode.toUpperCase();
+                if (!/^[A-Z]+$/.test(codeToAdd)) {
+                    this.speciesError = "Species code must contain only uppercase letters (A-Z).";
+                    return;
+                }
+                this.speciesLoading = true;
+                this.speciesError = null;
+                this.clearNotification();
+                axios.post('{% url "species-list-create" %}', { code: codeToAdd }, {
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(response => {
+                    this.speciesList.push(response.data);
+                    this.speciesList.sort((a, b) => a.code.localeCompare(b.code));
+                    this.newSpeciesCode = '';
+                    this.showNotification(`Species "${codeToAdd}" added successfully.`, 'success');
+                })
+                .catch(error => {
+                    console.error("Error adding species:", error);
+                    let errorMsg = 'Failed to add species.';
+                    if (error.response && error.response.data && error.response.data.error) {
+                        errorMsg = error.response.data.error;
+                    }
+                    this.speciesError = errorMsg; // Show error in modal
+                })
+                .finally(() => {
+                    this.speciesLoading = false;
+                });
+            },
+            deleteSpecies(codeToDelete) {
+                if (!confirm(`Are you sure you want to delete the species "${codeToDelete}"? Note: Deletion will fail if breeds are associated.`)) {
+                    return;
+                }
+                this.speciesLoading = true;
+                this.speciesError = null;
+                this.clearNotification();
+                const deleteUrl = `/api/species/${encodeURIComponent(codeToDelete)}/`;
+                axios.delete(deleteUrl, { headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                .then(response => {
+                    this.speciesList = this.speciesList.filter(s => s.code !== codeToDelete);
+                    this.showNotification(response.data.message || `Species "${codeToDelete}" deleted.`, 'success');
+                    // If the deleted species was selected in the breeds modal, clear it
+                    if (this.selectedBreedSpecies === codeToDelete) {
+                       this.selectedBreedSpecies = this.speciesList.length > 0 ? this.speciesList[0].code : '';
+                       this.handleSpeciesChange(); // Trigger breed reload
+                    }
+                })
+                .catch(error => {
+                    console.error("Error deleting species:", error);
+                    let errorMsg = 'Failed to delete species.';
+                    if (error.response && error.response.data && error.response.data.error) {
+                        errorMsg = error.response.data.error;
+                    }
+                    this.showNotification(errorMsg, 'error'); // Show error in banner
+                })
+                .finally(() => {
+                    this.speciesLoading = false;
+                });
+            },
+
+            // --- Breed Management Methods ---
+            openBreedsModal() {
+                this.isBreedsModalOpen = true;
+                this.newBreedName = '';
+                this.breedError = null;
+                this.breedSearchQuery = '';
+                this.isBreedFilterActive = false;
+                this.breedsPagination = { ...this.breedsPagination, page: 1, total_pages: 1, total_breeds: 0 };
+                this.breedsList = [];
+                this.clearNotification();
+
+                if (this.speciesList.length === 0) {
+                    this.fetchSpecies();
+                } else {
+                    this.speciesLoading = false;
+                }
+
+                this.$nextTick(() => {
+                    const defaultSpecies = this.speciesList.find(s => s.code === 'DOG') ? 'DOG' : (this.speciesList.length > 0 ? this.speciesList[0].code : '');
+                    this.selectedBreedSpecies = defaultSpecies;
+                    if (this.selectedBreedSpecies) {
+                        this.fetchBreeds();
+                    } else {
+                         this.breedsLoading = false;
+                    }
+                    if (this.$refs.newBreedInput) this.$refs.newBreedInput.focus();
+                });
+            },
+            closeBreedsModal() {
+                this.isBreedsModalOpen = false;
+            },
+            fetchBreeds() {
+                 if (!this.selectedBreedSpecies) {
+                     this.breedsList = [];
+                     this.breedsPagination = { ...this.breedsPagination, total_breeds: 0, total_pages: 1, page: 1, has_previous: false, has_next: false };
+                     this.breedsLoading = false;
+                     return;
+                 }
+                 this.breedsLoading = true;
+                 this.breedError = null;
+                 const params = {
+                     species_code: this.selectedBreedSpecies,
+                     page: this.breedsPagination.page,
+                     per_page: this.breedsPagination.per_page,
+                     search: this.breedSearchQuery
+                 };
+                 axios.get('{% url "breed-list-create" %}', { params })
+                 .then(response => {
+                     if (response.data.success) {
+                         this.breedsList = response.data.results;
+                         this.breedsPagination = { // Update fully from response
+                            total_breeds: response.data.total_breeds,
+                            total_pages: response.data.total_pages,
+                            page: response.data.page,
+                            per_page: response.data.per_page,
+                            has_previous: response.data.has_previous,
+                            has_next: response.data.has_next
+                         };
+                     } else {
+                          this.showNotification(response.data.error || 'Failed to load breeds.', 'error');
+                          this.breedsList = [];
+                          this.breedsPagination = { ...this.breedsPagination, total_breeds: 0, total_pages: 1, page: 1, has_previous: false, has_next: false };
+                     }
+                 })
+                 .catch(error => {
+                     console.error("Error fetching breeds:", error);
+                     this.showNotification("An error occurred while fetching breeds.", 'error');
+                     this.breedsList = [];
+                     this.breedsPagination = { ...this.breedsPagination, total_breeds: 0, total_pages: 1, page: 1, has_previous: false, has_next: false };
+                 })
+                 .finally(() => {
+                     this.breedsLoading = false;
+                 });
+            },
+            addBreed() {
+                if (!this.newBreedName || this.breedsLoading || !this.selectedBreedSpecies) return;
+                const nameToAdd = this.newBreedName;
+                this.breedsLoading = true;
+                this.breedError = null;
+                this.clearNotification();
+                axios.post('{% url "breed-list-create" %}', {
+                    name: nameToAdd,
+                    species_code: this.selectedBreedSpecies
+                }, {
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(response => {
+                     this.newBreedName = ''; 
+                     this.showNotification(`Breed "${nameToAdd}" added successfully.`, 'success');
+                     this.fetchBreeds();
+                })
+                .catch(error => {
+                    console.error("Error adding breed:", error);
+                    let errorMsg = 'Failed to add breed.';
+                    if (error.response && error.response.data && error.response.data.error) {
+                        errorMsg = error.response.data.error;
+                    }
+                    this.breedError = errorMsg; 
+                })
+                .finally(() => {
+                    this.breedsLoading = false;
+                });
+            },
+            deleteBreed(breedId, breedName) {
+                if (!confirm(`Are you sure you want to delete the breed "${breedName}"?`)) {
+                    return;
+                }
+                this.breedsLoading = true;
+                this.breedError = null;
+                this.clearNotification();
+                const deleteUrl = `/api/breeds/${breedId}/`;
+                axios.delete(deleteUrl, { headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+                .then(response => {
+                    this.showNotification(response.data.message || `Breed "${breedName}" deleted.`, 'success');
+                     if (this.breedsList.length === 1 && this.breedsPagination.page > 1) {
+                         this.breedsPagination.page -= 1;
+                     }
+                     this.fetchBreeds();
+                })
+                .catch(error => {
+                    console.error("Error deleting breed:", error);
+                    let errorMsg = 'Failed to delete breed.';
+                    if (error.response && error.response.data && error.response.data.error) {
+                        errorMsg = error.response.data.error;
+                    }
+                     this.showNotification(errorMsg, 'error'); 
+                })
+                .finally(() => {
+                    this.breedsLoading = false;
+                });
+            },
+            handleSpeciesChange() {
+                 this.breedsPagination.page = 1;
+                 this.breedSearchQuery = ''; 
+                 this.isBreedFilterActive = false;
+                 this.fetchBreeds();
+            },
+            applyBreedSearch() {
+                this.breedsPagination.page = 1;
+                this.isBreedFilterActive = !!this.breedSearchQuery;
+                this.fetchBreeds();
+            },
+            clearBreedSearch() {
+                if (this.breedSearchQuery || this.isBreedFilterActive) {
+                    this.breedSearchQuery = '';
+                    this.isBreedFilterActive = false;
+                    this.applyBreedSearch();
+                }
+            },
+            goToBreedPage(page) {
+                if (page >= 1 && page <= this.breedsPagination.total_pages && page !== this.breedsPagination.page) {
+                    this.breedsPagination.page = page;
+                    this.fetchBreeds();
                 }
             }
+        },
+        mounted() {
+            // Fetch species list on initial load for dropdowns (NEW)
+            this.fetchSpecies(); 
         }
     });
+
     manageApp.mount('#manage-app');
 </script>
 {% endblock scripts %} 

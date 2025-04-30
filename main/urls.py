@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
@@ -17,4 +17,12 @@ urlpatterns = [
     path('manage/owners/import/template/', views.OwnerImportTemplateView.as_view(), name='owner-import-template'),
     path('manage/owners/import/preview/', views.OwnerImportPreviewView.as_view(), name='owner-import-preview'),
     path('manage/owners/import/execute/', views.OwnerImportExecuteView.as_view(), name='owner-import-execute'),
+
+    # Species API (Corrected using single view for List/Create)
+    path('api/species/', views.SpeciesListCreateView.as_view(), name='species-list-create'), # Handles GET & POST
+    path('api/species/<str:code>/', views.SpeciesDeleteView.as_view(), name='species-delete'), # Handles DELETE
+
+    # Breed API
+    path('api/breeds/', views.BreedListCreateView.as_view(), name='breed-list-create'), # Handles GET (list) & POST (create)
+    path('api/breeds/<int:pk>/', views.BreedDeleteView.as_view(), name='breed-delete'),   # Handles DELETE
 ]

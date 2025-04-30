@@ -12,8 +12,12 @@ from django.utils import timezone
 from django.db import transaction
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
+from django.db import IntegrityError
+from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
-from .models import Owner
+from .models import Owner, Species, Breed
 from .forms import OwnerForm
 
 # Create your views here.
@@ -379,3 +383,193 @@ class OwnerImportExecuteView(View):
         except Exception as e:
             print(f"Error during execute: {e}")
             return JsonResponse({'success': False, 'error': 'An unexpected error occurred while importing the file.'}, status=500)
+
+# ==========================
+# Species API Views
+# ==========================
+
+# Combined View for List (GET) and Create (POST)
+class SpeciesListCreateView(View):
+    # GET method from original SpeciesListView
+    def get(self, request, *args, **kwargs):
+        species = Species.objects.all().order_by('code').values('code')
+        return JsonResponse(list(species), safe=False)
+
+    # POST method from original SpeciesCreateView
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+            code = data.get('code')
+
+            if not code:
+                return JsonResponse({'error': 'Species code is required.'}, status=400)
+
+            code = code.strip().upper()
+            if not code:
+                 return JsonResponse({'error': 'Species code cannot be empty.'}, status=400)
+            
+            # Basic validation: Allow only letters
+            if not code.isalpha():
+                return JsonResponse({'error': 'Species code should only contain letters.'}, status=400)
+
+            try:
+                new_species = Species.objects.create(code=code)
+                return JsonResponse({'code': new_species.code}, status=201)
+            except IntegrityError:
+                return JsonResponse({'error': f'Species code "{code}" already exists.'}, status=400)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+        except Exception as e:
+            # Log the exception e
+            print(f"Error creating species: {e}") # Added basic logging
+            return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
+
+# Remove csrf_exempt as token is sent via X-CSRFToken header in AJAX
+# @method_decorator(csrf_exempt, name='dispatch')
+class SpeciesDeleteView(View):
+    def delete(self, request, code, *args, **kwargs):
+        try:
+            species_to_delete = Species.objects.get(code=code)
+
+            # Check if any breeds are associated with this species
+            if Breed.objects.filter(species=species_to_delete).exists():
+                return JsonResponse({
+                    'error': f'Cannot delete species "{code}" because it has associated breeds.'
+                }, status=400)
+
+            species_to_delete.delete()
+            return JsonResponse({'message': f'Species "{code}" deleted successfully.'}, status=200) # Use 200 OK for successful DELETE
+
+        except Species.DoesNotExist:
+            return JsonResponse({'error': f'Species "{code}" not found.'}, status=404)
+        except Exception as e:
+            # Log the exception e
+            return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
+
+# ==========================
+# Breed API Views
+# ==========================
+
+class BreedListCreateView(View):
+    DEFAULT_PER_PAGE = 25
+    MAX_PER_PAGE = 100
+
+    # GET: List breeds (filtered, searched, paginated)
+    def get(self, request, *args, **kwargs):
+        species_code = request.GET.get('species_code')
+        search_query = request.GET.get('search', '').strip()
+        try:
+            page = int(request.GET.get('page', 1))
+            per_page = int(request.GET.get('per_page', self.DEFAULT_PER_PAGE))
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid page or per_page parameter.'}, status=400)
+
+        # Validate per_page
+        if per_page <= 0: per_page = self.DEFAULT_PER_PAGE
+        elif per_page > self.MAX_PER_PAGE: per_page = self.MAX_PER_PAGE
+
+        if not species_code:
+            return JsonResponse({'success': False, 'error': 'Species code is required.'}, status=400)
+
+        try:
+            target_species = Species.objects.get(code=species_code.upper())
+        except Species.DoesNotExist:
+             return JsonResponse({'success': False, 'error': f'Species "{species_code}" not found.'}, status=404)
+
+        # Base queryset for the selected species
+        breed_queryset = Breed.objects.filter(species=target_species)
+
+        # Apply search filter if query provided
+        if search_query:
+            breed_queryset = breed_queryset.filter(name__icontains=search_query)
+
+        # Apply ordering
+        breed_queryset = breed_queryset.order_by('name')
+
+        # Paginate
+        paginator = Paginator(breed_queryset, per_page)
+        try:
+            breeds_page = paginator.page(page)
+        except PageNotAnInteger:
+            breeds_page = paginator.page(1)
+            page = 1
+        except EmptyPage:
+            breeds_page = paginator.page(paginator.num_pages)
+            page = paginator.num_pages
+        
+        # Check if requested page is valid after filtering
+        if page > paginator.num_pages:
+            page = paginator.num_pages if paginator.num_pages > 0 else 1
+            breeds_page = paginator.page(page)
+
+        results = list(breeds_page.object_list.values('id', 'name')) # Only need id and name
+
+        data = {
+            'success': True,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': paginator.num_pages,
+            'total_breeds': paginator.count,
+            'has_previous': breeds_page.has_previous(),
+            'has_next': breeds_page.has_next(),
+            'results': results,
+        }
+        return JsonResponse(data)
+
+    # POST: Create a new breed
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+            species_code = data.get('species_code')
+            name = data.get('name')
+
+            if not species_code or not name:
+                return JsonResponse({'error': 'Species code and breed name are required.'}, status=400)
+
+            name = name.strip()
+            if not name:
+                return JsonResponse({'error': 'Breed name cannot be empty.'}, status=400)
+
+            try:
+                target_species = Species.objects.get(code=species_code.upper())
+            except Species.DoesNotExist:
+                return JsonResponse({'error': f'Species "{species_code}" not found.'}, status=404)
+            
+            # Check for duplicate breed name within the same species
+            if Breed.objects.filter(species=target_species, name__iexact=name).exists():
+                 return JsonResponse({'error': f'Breed "{name}" already exists for species "{species_code}".'}, status=400)
+
+            try:
+                new_breed = Breed.objects.create(species=target_species, name=name)
+                # Return the created breed's id and name
+                return JsonResponse({'id': new_breed.id, 'name': new_breed.name}, status=201)
+            except IntegrityError as e: # Catch potential db-level constraints
+                return JsonResponse({'error': f'Could not create breed. Database error: {e}'}, status=400)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+        except Exception as e:
+            print(f"Error creating breed: {e}")
+            return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
+
+
+class BreedDeleteView(View):
+    def delete(self, request, pk, *args, **kwargs):
+        try:
+            breed_to_delete = Breed.objects.get(pk=pk)
+            breed_name = breed_to_delete.name # Get name for message
+            species_code = breed_to_delete.species.code # Get species for message
+            
+            # Future check: Prevent deletion if breed is used by Patients
+            # if Patient.objects.filter(breed=breed_to_delete).exists():
+            #     return JsonResponse({'error': f'Cannot delete breed "{breed_name}" because it is assigned to patients.'}, status=400)
+            
+            breed_to_delete.delete()
+            return JsonResponse({'message': f'Breed "{breed_name}" (Species: {species_code}) deleted successfully.'}, status=200)
+
+        except Breed.DoesNotExist:
+            return JsonResponse({'error': 'Breed not found.'}, status=404)
+        except Exception as e:
+            print(f"Error deleting breed: {e}")
+            return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)

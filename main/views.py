@@ -36,7 +36,7 @@ class OwnerListView(ListView):
     # def get_context_data(...): ...
 
 # --- API View for Paginated Owners (Modified) ---
-class OwnerListAPIView(View):
+class OwnerListCreateAPIView(View):
     DEFAULT_PER_PAGE = 20
     MAX_PER_PAGE = 100
     DEFAULT_FILTER_FIELDS = ['last_name', 'first_name', 'email', 'telephone', 'address', 'comments'] # Default fields to search
@@ -129,22 +129,42 @@ class OwnerListAPIView(View):
         }
         return JsonResponse(data, safe=False) # safe=False needed for list serialization if not using dict wrapper
 
-# View to handle Owner Create/Update via AJAX
-class OwnerCreateUpdateView(View):
-    def post(self, request, pk=None):
+    # --- POST method added for CREATING owners ---
+    def post(self, request, *args, **kwargs):
         try:
             # Load data from JSON request body
             data = json.loads(request.body)
         except json.JSONDecodeError:
             return JsonResponse({'success': False, 'errors': {'__all__': 'Invalid JSON format'}}, status=400)
 
-        if pk:
-            owner = get_object_or_404(Owner, pk=pk)
-            # Pass loaded data to the form instance
-            form = OwnerForm(data, instance=owner)
+        # This post method is only for CREATION
+        form = OwnerForm(data)
+
+        if form.is_valid():
+            owner = form.save()
+            # Return the saved owner data as JSON (convert model instance to dict)
+            return JsonResponse({'success': True, 'owner': model_to_dict(owner)}, status=201) # Use 201 Created status
         else:
-            # Pass loaded data to the form for creation
-            form = OwnerForm(data)
+            # Return form errors as JSON
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+# View to handle Owner Update via AJAX (Removed Create logic)
+class OwnerCreateUpdateView(View):
+    def post(self, request, pk): # Expect pk for updates
+        # Ensure pk is provided for an update operation
+        if not pk:
+             return JsonResponse({'success': False, 'error': 'Owner ID (pk) is required for update.'}, status=400)
+
+        try:
+            # Load data from JSON request body
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'errors': {'__all__': 'Invalid JSON format'}}, status=400)
+
+        # Fetch the existing owner instance
+        owner = get_object_or_404(Owner, pk=pk)
+        # Pass loaded data and the instance to the form for updating
+        form = OwnerForm(data, instance=owner)
 
         if form.is_valid():
             owner = form.save()

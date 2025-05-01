@@ -7,8 +7,7 @@ urlpatterns = [
     path('manage/', views.manage, name='manage'),
 
     # API URLs for Owner CRUD (AJAX)
-    path('api/owners/', views.OwnerListAPIView.as_view(), name='owner-list-api'),
-    path('api/owners/', views.OwnerCreateUpdateView.as_view(), name='owner-create'),
+    path('api/owners/', views.OwnerListCreateAPIView.as_view(), name='owner-list-api'),
     path('api/owners/<int:pk>/', views.OwnerDetailView.as_view(), name='owner-detail'),
     path('api/owners/<int:pk>/update/', views.OwnerCreateUpdateView.as_view(), name='owner-update'),
     path('api/owners/<int:pk>/delete/', views.OwnerDeleteView.as_view(), name='owner-delete'),

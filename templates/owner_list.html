@@ -23,7 +23,7 @@
     <div id="owner-app" class="py-8" 
          data-csrf-token="{{ csrf_token }}"
          data-list-api-url="{% url 'owner-list-api' %}"
-         data-create-api-url="{% url 'owner-create' %}"
+         data-create-api-url="{% url 'owner-list-api' %}"
          data-detail-api-url-base="{% url 'owner-detail' pk=0 %}" {# Placeholder PK #}
          data-update-api-url-base="{% url 'owner-update' pk=0 %}" {# Placeholder PK #}
          data-delete-api-url-base="{% url 'owner-delete' pk=0 %}" {# Placeholder PK #}>

@@ -25,11 +25,10 @@ const patientApp = Vue.createApp({
                 species: null, // FK to Species (use code for selection)
                 breed: null, // FK to Breed
                 sex: 'F', // Default to Female
-                weight: null,
-                // --- Fields for Create --- 
                 intact: true, // Default to intact
-                ageValue: null, 
-                ageUnit: 'years', // Default unit
+                date_of_birth: null, // Store DOB directly now
+                weight: null,
+                comments: '', // Added comments field
             },
             formErrors: {}, // To display validation errors
             // Dropdown options
@@ -462,13 +461,13 @@ const patientApp = Vue.createApp({
                 sex: 'F', weight: null,
                 // Create mode defaults
                 intact: true, 
-                ageValue: null, 
-                ageUnit: 'years' 
+                date_of_birth: null,
+                comments: '',
             };
             this.formErrors = {};
-            // Destroy breed dropdown instance
-            this.breedTomSelect?.destroy();
-            this.breedTomSelect = null;
+            // Clear Tom Select instances
+            this.ownerTomSelect?.clear();
+            this.breedTomSelect?.clear();
         },
         openCreateModal() {
             this.resetForm();
@@ -508,13 +507,12 @@ const patientApp = Vue.createApp({
                              owner: fullPatientData.owner,
                              name: fullPatientData.name,
                              species: fullPatientData.species, // Species code
-                             breed: fullPatientData.breed, // Breed ID
+                             breed: fullPatientData.breed, // Send breed ID
                              sex: fullPatientData.sex,
                              intact: fullPatientData.intact,
+                             date_of_birth: fullPatientData.date_of_birth, // Use the stored DOB
                              weight: fullPatientData.weight,
-                             // Populate calculated age
-                             ageValue: ageInput.value,
-                             ageUnit: ageInput.unit,
+                             comments: fullPatientData.comments, // Populate comments
                          };
 
                          // Prepare initial owner data for Tom Select
@@ -643,9 +641,9 @@ const patientApp = Vue.createApp({
             }
 
             // Calculate DOB from age input before sending
-            if (this.patientForm.ageValue !== null && this.patientForm.ageValue >= 0 && this.patientForm.ageUnit) {
+            if (this.patientForm.date_of_birth !== null && this.patientForm.date_of_birth >= 0 && this.patientForm.date_of_birth) {
                 try {
-                     const calculatedDOBString = this._calculateDOBFromAge(this.patientForm.ageValue, this.patientForm.ageUnit);
+                     const calculatedDOBString = this._calculateDOBFromAge(this.patientForm.date_of_birth);
                      if (!calculatedDOBString) {
                          throw new Error("Could not calculate valid DOB string.");
                      }
@@ -662,10 +660,6 @@ const patientApp = Vue.createApp({
                 this.isSaving = false;
                 return;
             }
-
-            // Remove age fields before sending (they are not part of the backend model)
-            delete dataToSend.ageValue;
-            delete dataToSend.ageUnit;
 
             axios({
                 method: method,
@@ -724,7 +718,7 @@ const patientApp = Vue.createApp({
                 this.isDeleting = false;
             });
         },
-        _calculateDOBFromAge(ageValue, ageUnit) {
+        _calculateDOBFromAge(ageValue) {
             const age = parseInt(ageValue);
             if (isNaN(age) || age < 0) {
                 console.error("Invalid age value for DOB calculation:", ageValue);
@@ -734,23 +728,7 @@ const patientApp = Vue.createApp({
             const now = new Date();
             let calculatedDOB = new Date(now);
 
-            switch (ageUnit) {
-                case 'days':
-                    calculatedDOB.setDate(now.getDate() - age);
-                    break;
-                case 'weeks':
-                    calculatedDOB.setDate(now.getDate() - age * 7);
-                    break;
-                case 'months':
-                    calculatedDOB.setMonth(now.getMonth() - age);
-                    break;
-                case 'years':
-                    calculatedDOB.setFullYear(now.getFullYear() - age);
-                    break;
-                default:
-                     console.error("Invalid age unit for DOB calculation:", ageUnit);
-                     return null; // Indicate error
-            }
+            calculatedDOB.setFullYear(now.getFullYear() - age);
 
             // Check if the calculated date is valid before formatting
             if (isNaN(calculatedDOB.getTime())) {

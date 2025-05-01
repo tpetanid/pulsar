@@ -41,3 +41,11 @@
     *   **Pros:** Better encapsulation (template, script, style per component), improved reusability, cleaner main template (`owner_list.html` would use `<owner-modal>...</owner-modal>` tags).
     *   **Cons:** Requires deeper Vue knowledge (props, events), might necessitate a JavaScript build step if using Single File Components (`.vue` files).
     *   **Decision:** Keep this as a potential future improvement if frontend complexity increases significantly. 
+
+## JavaScript Dependencies (Vue vs Axios)
+
+- **Observation:** Both `owner_list.html` (via `static/js/owner_list.js`) and `manage.html` (inline script) use Vue.js and Axios.
+- **Analysis:**
+    - Vue.js is essential for the current dynamic UI implementation (rendering, state management, event handling).
+    - Axios is used only for making AJAX calls to the backend API and can be replaced by the native browser `fetch` API.
+- **Action:** Consider refactoring API calls to use `fetch` instead of Axios in the future to reduce dependencies. This would require modifying the JavaScript logic in both `owner_list.js` and the `manage.html` template script. 

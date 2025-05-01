@@ -40,6 +40,9 @@ const ownerApp = Vue.createApp({
                  { label: 'Comments', value: 'comments' },
             ],
             selectedFilterFields: ['last_name', 'first_name', 'email', 'telephone', 'address', 'comments'], // Default selected fields
+            // Sort state
+            sortField: 'updated_at', // Default sort field
+            sortDirection: 'desc', // Default sort direction ('asc' or 'desc')
             // URLs and CSRF Token will be read from data attributes
             listApiUrl: '',
             createApiUrl: '',
@@ -64,7 +67,17 @@ const ownerApp = Vue.createApp({
         }
     },
     methods: {
-         readConfig() {
+        formatDate(isoString) {
+            if (!isoString) return '';
+            try {
+                // Extract YYYY-MM-DD part
+                return isoString.split('T')[0];
+            } catch (e) {
+                console.error("Error formatting date:", isoString, e);
+                return isoString; // Return original string on error
+            }
+        },
+        readConfig() {
             const appElement = document.getElementById('owner-app');
             if (appElement && appElement.dataset) {
                 this.csrfToken = appElement.dataset.csrfToken;
@@ -83,6 +96,8 @@ const ownerApp = Vue.createApp({
                 page: this.currentPage,
                 per_page: this.perPage,
                 query: this.searchQuery,
+                sort: this.sortField,
+                direction: this.sortDirection
             });
             // Add selected filter fields to params
             this.selectedFilterFields.forEach(field => {
@@ -138,6 +153,17 @@ const ownerApp = Vue.createApp({
          },
           toggleFilters() {
              this.showFilters = !this.showFilters;
+         },
+         changeSort(field) {
+             if (this.sortField === field) {
+                 // Toggle direction if clicking the same field
+                 this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+             } else {
+                 // Default to ascending for a new field
+                 this.sortField = field;
+                 this.sortDirection = 'asc';
+             }
+             this.fetchPaginatedOwners(); // Re-fetch data with new sorting
          },
         resetForm() {
             this.ownerForm = { id: null, last_name: '', first_name: '', email: '', telephone: '', address: '', comments: '' };
@@ -210,6 +236,22 @@ const ownerApp = Vue.createApp({
                       alert("Failed to load owner details for viewing.");
                  });
          },
+        openEditFromViewModal() {
+            // Get the owner details currently being viewed
+            const ownerToEdit = this.currentOwner;
+            // Close the view modal first
+            this.closeModal();
+            // Then, open the edit modal with the fetched owner data
+            // Use nextTick to ensure the view modal is fully closed before opening edit
+            this.$nextTick(() => {
+               if (ownerToEdit && ownerToEdit.id) {
+                   this.openEditModal(ownerToEdit);
+               } else {
+                   console.error("Cannot open edit modal: current owner data is missing or invalid.");
+                   // Optionally show an error to the user
+                }
+           });
+        },
         closeModal(event) {
              // Close any modal if backdrop is clicked (event.target === event.currentTarget)
              // or if called directly without event (e.g., from button)

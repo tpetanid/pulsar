@@ -70,6 +70,18 @@ class OwnerListAPIView(View):
             # Option 2: Default back to all searchable fields if query present
              valid_filter_fields = self.DEFAULT_FILTER_FIELDS
 
+        # Get sort parameters
+        default_sort_field = 'updated_at'
+        allowed_sort_fields = {'last_name', 'first_name', 'email', 'telephone', 'updated_at'} # Add any other sortable fields
+        sort_field = request.GET.get('sort', default_sort_field).lower()
+        sort_direction = request.GET.get('direction', 'desc').lower()
+
+        # Validate sort parameters
+        if sort_field not in allowed_sort_fields:
+            sort_field = default_sort_field
+        if sort_direction not in ['asc', 'desc']:
+            sort_direction = 'desc'
+
         # Get base queryset
         owner_queryset = Owner.objects.all()
 
@@ -80,8 +92,10 @@ class OwnerListAPIView(View):
                 q_objects |= Q(**{f'{field_name}__icontains': query})
             owner_queryset = owner_queryset.filter(q_objects)
 
-        # Apply ordering
-        owner_queryset = owner_queryset.order_by('last_name', 'first_name')
+        # Apply dynamic ordering
+        order_by_string = f"{'-' if sort_direction == 'desc' else ''}{sort_field}"
+        # Add a secondary sort key (e.g., pk) for stable sorting if primary keys are equal
+        owner_queryset = owner_queryset.order_by(order_by_string, 'pk')
 
         # Paginate
         paginator = Paginator(owner_queryset, per_page)

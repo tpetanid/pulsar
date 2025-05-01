@@ -20,7 +20,7 @@
 
 {% block content %}
     {# Add data attributes to pass config to JS #}
-    <div id="owner-app" class="px-4 py-8" 
+    <div id="owner-app" class="py-8" 
          data-csrf-token="{{ csrf_token }}"
          data-list-api-url="{% url 'owner-list-api' %}"
          data-create-api-url="{% url 'owner-create' %}"
@@ -38,47 +38,50 @@
             </div>
 
             {# --- Filter Controls --- #}
-            <div class="mb-4">
-                 {# Button to toggle filter visibility #}
-                 <button @click="toggleFilters" class="text-sm text-indigo-600 hover:text-indigo-800 mb-2">
-                     [[ showFilters ? 'Hide Filters' : 'Show Filters' ]] [[ showFilters ? '&#x25B2;' : '&#x25BC;' ]]
-                 </button>
+            {# Container for Filter Toggle Button and Per Page Controls #}
+            <div class="flex justify-between items-center mb-2"> {# Adjusted margin #}
+                {# Button to toggle filter visibility - Styled as a button #}
+                <button @click="toggleFilters" 
+                        class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <span class="mr-1.5">[[ showFilters ? 'Hide Filters' : 'Show Filters' ]]</span>
+                    <span>[[ showFilters ? '&#x25B2;' : '&#x25BC;' ]]</span>
+                </button>
 
-                 {# Filter Section - Conditionally rendered #}
-                 <transition name="fade"> {# Optional: Add transition #}
-                 <div v-if="showFilters" class="p-4 bg-gray-50 rounded-md border border-gray-200 space-y-3">
-                    <div class="flex items-center space-x-4">
-                        <label for="search-query" class="text-sm font-medium text-gray-700">Search:</label> {# Changed text #}
-                        <input type="text" id="search-query" v-model.lazy="searchQuery" @keyup.enter="applyFilters"
-                               placeholder="Enter search term..."
-                               class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
-                        <button @click="applyFilters" class="text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-3 rounded">Apply</button>
-                        <button @click="clearFilters" v-if="searchQuery || selectedFilterFields.length !== filterFields.length" class="text-sm text-gray-600 hover:text-gray-900">Clear</button>
-                    </div>
-                    <div class="flex items-center space-x-2 flex-wrap">
-                        <span class="text-sm font-medium text-gray-700 mr-2">In fields:</span>
-                        <label v-for="field in filterFields" :key="field.value" class="inline-flex items-center mr-3 text-sm">
-                            <input type="checkbox" :value="field.value" v-model="selectedFilterFields" @change="applyFilters"
-                                   class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50">
-                            <span class="ml-1.5 text-gray-700">[[ field.label ]]</span>
-                        </label>
-                    </div>
+                {# --- Per Page Selector (Moved Here) --- #}
+                <div class="flex items-center space-x-2"> {# Grouping div for right side #}
+                    <label for="per-page" class="text-sm font-medium text-gray-700">Show:</label>
+                    <select id="per-page" v-model.number="perPage" @change="changePerPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <span class="text-sm text-gray-600">([[ totalOwners ]] total owners)</span> {# Removed ml-4, using space-x-2 now #}
                 </div>
-                </transition>
-             </div>
-            {# --- End Filter Controls --- #}
-
-            {# --- Per Page Selector --- #}
-            <div class="mb-4 flex justify-start items-center">
-                 <label for="per-page" class="text-sm font-medium text-gray-700 mr-2">Show:</label>
-                 <select id="per-page" v-model.number="perPage" @change="changePerPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
-                     <option value="10">10</option>
-                     <option value="20">20</option>
-                     <option value="50">50</option>
-                     <option value="100">100</option>
-                 </select>
-                 <span class="text-sm text-gray-600 ml-4">([[ totalOwners ]] total owners)</span>
             </div>
+
+            {# Filter Section - Conditionally rendered (remains below the toggle/per-page row) #}
+            <transition name="fade"> {# Optional: Add transition #}
+            <div v-if="showFilters" class="mb-4 p-4 bg-gray-50 rounded-md border border-gray-200 space-y-3"> {# Added mb-4 here #}
+                <div class="flex items-center space-x-4">
+                    <label for="search-query" class="text-sm font-medium text-gray-700">Search:</label> {# Changed text #}
+                    <input type="text" id="search-query" v-model.lazy="searchQuery" @keyup.enter="applyFilters"
+                           placeholder="Enter search term..."
+                           class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                    <button @click="applyFilters" class="text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-3 rounded">Apply</button>
+                    <button @click="clearFilters" v-if="searchQuery || selectedFilterFields.length !== filterFields.length" class="text-sm text-gray-600 hover:text-gray-900">Clear</button>
+                </div>
+                <div class="flex items-center space-x-2 flex-wrap">
+                    <span class="text-sm font-medium text-gray-700 mr-2">In fields:</span>
+                    <label v-for="field in filterFields" :key="field.value" class="inline-flex items-center mr-3 text-sm">
+                        <input type="checkbox" :value="field.value" v-model="selectedFilterFields" @change="applyFilters"
+                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50">
+                        <span class="ml-1.5 text-gray-700">[[ field.label ]]</span>
+                    </label>
+                </div>
+            </div>
+            </transition>
+            {# --- End Filter Controls --- #}
 
             <!-- Loading Indicator -->
             <div v-if="isLoading" class="text-center py-10">

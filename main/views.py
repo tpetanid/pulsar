@@ -521,7 +521,6 @@ class PatientListAPIView(View):
                 'weight': str(patient.weight) if patient.weight is not None else None, # Send as string
                 'created_at': patient.created_at.isoformat() if patient.created_at else None,
                 'updated_at': patient.updated_at.isoformat() if patient.updated_at else None,
-                'comments': patient.comments,
             })
 
         # --- Prepare JSON Response ---
@@ -601,7 +600,6 @@ class PatientDetailView(View):
             'breed_name': patient.breed.name,
             'created_at': patient.created_at.isoformat() if patient.created_at else None,
             'updated_at': patient.updated_at.isoformat() if patient.updated_at else None,
-            'comments': patient.comments,
         }
         return JsonResponse(data)
 
@@ -812,17 +810,17 @@ class PatientImportTemplateView(View):
             # Owner Fields (Required last_name)
             'last_name', 'first_name', 'email', 'telephone', 'address', 'owner_comments',
             # Patient Fields (All required except one of dob/age)
-            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg', 'patient_comments'
+            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg'
         ]
         writer.writerow(headers)
         # Example row
         writer.writerow([
             'Smith', 'Jane', 'jane.s@example.com', '555-5678', '456 Oak Ave', 'New client',
-            'Buddy', 'DOG', 'Labrador Retriever', 'M', 'true', '2020-05-10', '', '30.5', 'Needs yearly checkup'
+            'Buddy', 'DOG', 'Labrador Retriever', 'M', 'true', '2020-05-10', '', '30.5'
         ])
         writer.writerow([
             'Jones', 'Robert', 'rob.j@mail.net', '', '', '',
-            'Whiskers', 'CAT', 'Domestic Shorthair', 'F', 'false', '', '5', '4.2', ''
+            'Whiskers', 'CAT', 'Domestic Shorthair', 'F', 'false', '', '5', '4.2'
         ])
 
         return response
@@ -847,8 +845,7 @@ class PatientImportPreviewView(View):
         date_or_age_headers = {'date_of_birth', 'age_years'}
         allowed_headers = {
             'last_name', 'first_name', 'email', 'telephone', 'address', 'owner_comments',
-            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg',
-            'patient_comments' # Added patient comments
+            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg'
         }
 
         total_record_count = 0
@@ -1033,7 +1030,6 @@ class PatientImportExecuteView(View):
                         dob_str = row.get('date_of_birth', '').strip()
                         age_str = row.get('age_years', '').strip()
                         weight_str = row.get('weight_kg', '').strip()
-                        patient_comm = row.get('patient_comments', '').strip()
 
                         # Required patient fields check
                         if not all([patient_name, species_code, breed_name, sex, intact_str, weight_str]):
@@ -1154,7 +1150,6 @@ class PatientImportExecuteView(View):
                              'intact': intact,
                              'date_of_birth': dob,
                              'weight': weight_kg,
-                             'comments': patient_comm, # Added comments
                          }
                         patients_to_create.append(Patient(**patient_data))
 

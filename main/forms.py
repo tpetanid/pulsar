@@ -21,7 +21,7 @@ class PatientForm(forms.ModelForm):
 
     class Meta:
         model = Patient
-        fields = ['owner', 'name', 'species', 'breed', 'sex', 'intact', 'date_of_birth', 'weight', 'comments']
+        fields = ['owner', 'name', 'species', 'breed', 'sex', 'intact', 'date_of_birth', 'weight']
         # Add widgets if direct form rendering was used (not strictly needed for API)
         # widgets = {
         #     'date_of_birth': forms.DateInput(attrs={'type': 'date'}),

@@ -317,15 +317,6 @@
                             <p v-if="formErrors.weight" class="mt-1 text-xs text-red-500">[[ formErrors.weight.join(', ') ]]</p>
                         </div>
 
-                        {# --- Comments --- #}
-                        <div>
-                            <label for="comments" class="block text-sm font-medium text-gray-700">Comments</label>
-                            <textarea v-model="patientForm.comments" id="comments" rows="3"
-                                      class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                      :class="{'border-red-500': formErrors.comments, 'border-gray-300': !formErrors.comments}"></textarea>
-                            <p v-if="formErrors.comments" class="mt-1 text-xs text-red-500">[[ formErrors.comments.join(', ') ]]</p>
-                        </div>
-
                         <div class="items-center px-4 py-3">
                             <button type="submit" :disabled="isSaving"
                                     class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50">

@@ -55,7 +55,6 @@ class Patient(models.Model):
     intact = models.BooleanField() # True if intact, False if neutered/spayed
     date_of_birth = models.DateField()
     weight = models.DecimalField(max_digits=5, decimal_places=2, help_text="Weight in kilograms") # e.g., 999.99 kg
-    comments = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

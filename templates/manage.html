@@ -27,6 +27,9 @@
          data-species-delete-url-base="/api/species/" {# Base URL, code appended in JS #}
          data-breed-list-create-url="{% url 'breed-list-create' %}"
          data-breed-delete-url-base="/api/breeds/" {# Base URL, ID appended in JS #}
+         data-patient-import-template-url="{% url 'patient-import-template' %}"
+         data-patient-import-preview-url="{% url 'patient-import-preview' %}"
+         data-patient-import-execute-url="{% url 'patient-import-execute' %}"
     >
         {# Remove {% csrf_token %} input field as it's passed via data attribute #}
 
@@ -73,8 +76,8 @@
                      <div class="p-5">
                         <h3 class="text-lg leading-6 font-medium text-lime-600">Import Patients</h3>
                         <p class="mt-2 text-sm text-gray-500">Bulk import patient data from a file.</p>
-                         <button @click="openImportModal" disabled class="mt-3 text-sm font-medium text-white bg-lime-500 hover:bg-lime-600 py-1 px-3 rounded disabled:opacity-50 disabled:cursor-not-allowed">
-                            Import Patients (WIP)
+                         <button @click="openPatientImportModal" class="mt-3 text-sm font-medium text-white bg-lime-500 hover:bg-lime-600 py-1 px-3 rounded">
+                            Import Patients
                         </button>
                     </div>
                 </div>
@@ -327,6 +330,97 @@
                 </div>
             </div>
         </div>
+
+        <!-- == Patient Import Modal == -->
+        <transition name="fade">
+            <div v-if="isPatientImportModalOpen" ref="patientImportModal" @click="closePatientImportModal" @keydown.escape="closePatientImportModal" tabindex="-1"
+                class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
+                <div @click.stop class="relative mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 text-center mb-4">Import Patients and Owners</h3>
+
+                    <div class="space-y-4 px-4">
+                        <p class="text-sm text-gray-600">
+                            Upload a CSV file to bulk import patient data. Each row represents one patient and must include its associated owner's information.
+                            If an owner (matched by last name, first name, and email) already exists, their record might be updated with new telephone/address/comments from the file.
+                            If the owner does not exist, a new owner record will be created.
+                        </p>
+                        <p class="text-sm text-gray-600">
+                            The system will attempt to find existing species and breeds (case-insensitive). If a breed is not found for the specified species, it will be created automatically.
+                            Species must exist in the database beforehand.
+                        </p>
+                         <p class="text-sm text-red-600 font-semibold">
+                            Duplicate patients (same owner, name, species, breed, and date of birth) will be skipped.
+                        </p>
+
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700 mb-1">Required Format:</strong>
+                            <a :href="patientTemplateDownloadUrl" download
+                               class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mb-2">
+                               Download Template CSV
+                            </a>
+                            <ul class="list-disc list-inside text-sm text-gray-500 space-y-1 columns-2">
+                                <li v-for="field in patientRequiredFields" :key="field.name">
+                                    <code class="bg-gray-200 px-1 rounded">[[ field.name ]]</code>
+                                    <span v-if="field.required === 'always'" class="text-red-600 font-semibold"> (Required)</span>
+                                    <span v-else-if="field.required === 'conditional'" class="text-orange-600 font-semibold"> (Required if owner new)</span>
+                                    <span v-else-if="field.required === 'either'" class="text-purple-600 font-semibold"> (Need [[ field.eitherField ]])</span>
+                                    <span v-else> (Optional)</span>
+                                    - <span class="text-xs italic">([[ field.type ]])</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {# File input #}
+                        <div>
+                             <label for="patient-file-upload" class="block text-sm font-medium text-gray-700">Select CSV File:</label>
+                             <input id="patient-file-upload" name="patient-file-upload" type="file" ref="patientFileInput"
+                                    @change="handlePatientFileChange"
+                                    accept=".csv" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                        </div>
+
+                        <!-- Validation Errors -->
+                        <div v-if="patientValidationErrors.length > 0" class="mt-2 text-sm text-red-600 bg-red-100 p-3 rounded">
+                            <p><strong>Errors:</strong></p>
+                            <ul>
+                                <li v-for="error in patientValidationErrors" :key="error">[[ error ]]</li>
+                            </ul>
+                        </div>
+
+                         <!-- Preview Section -->
+                        <div v-if="patientPreviewData.length > 0">
+                            <h4 class="text-md font-medium text-gray-800 mb-2">File Preview (Showing first [[ patientPreviewData.length ]] of [[ patientTotalRecords ]] total records):</h4>
+                            <div class="overflow-x-auto max-h-60 border border-gray-200 rounded">
+                                <table class="min-w-full divide-y divide-gray-200 text-xs">
+                                    <thead class="bg-gray-50 sticky top-0">
+                                        <tr>
+                                            <th v-for="header in patientPreviewHeaders" :key="header" scope="col" class="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">[[ header ]]</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <tr v-for="(row, index) in patientPreviewData" :key="index">
+                                            <td v-for="(cell, cellIndex) in row" :key="cellIndex" class="px-4 py-2 whitespace-nowrap">[[ cell ]]</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="items-center px-4 py-3 mt-4 text-right border-t border-gray-200">
+                         <button @click="confirmPatientImport" :disabled="!canImportPatient || isProcessingPatientImport"
+                                class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            [[ isProcessingPatientImport ? 'Importing...' : 'Import Patients & Owners' ]]
+                        </button>
+                        <button @click="closePatientImportModal"
+                                class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
     </div>
 {% endblock content %}
 

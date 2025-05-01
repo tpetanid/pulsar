@@ -792,3 +792,446 @@ class BreedDeleteView(View):
         except Exception as e:
             print(f"Error deleting breed: {e}")
             return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
+
+# ==========================
+# Patient Import Views
+# ==========================
+
+class PatientImportTemplateView(View):
+    def get(self, request, *args, **kwargs):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="patient_import_template.csv"'
+
+        writer = csv.writer(response)
+        # Combine Owner and Patient fields
+        # REQUIRED Owner: last_name
+        # REQUIRED Patient: name, species_code, breed_name, sex, intact, weight, EITHER date_of_birth OR age_years
+        headers = [
+            # Owner Fields (Required last_name)
+            'last_name', 'first_name', 'email', 'telephone', 'address', 'owner_comments',
+            # Patient Fields (All required except one of dob/age)
+            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg'
+        ]
+        writer.writerow(headers)
+        # Example row
+        writer.writerow([
+            'Smith', 'Jane', 'jane.s@example.com', '555-5678', '456 Oak Ave', 'New client',
+            'Buddy', 'DOG', 'Labrador Retriever', 'M', 'true', '2020-05-10', '', '30.5'
+        ])
+        writer.writerow([
+            'Jones', 'Robert', 'rob.j@mail.net', '', '', '',
+            'Whiskers', 'CAT', 'Domestic Shorthair', 'F', 'false', '', '5', '4.2'
+        ])
+
+        return response
+
+
+class PatientImportPreviewView(View):
+    PREVIEW_ROW_COUNT = 10
+
+    def post(self, request, *args, **kwargs):
+        if 'file' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No file uploaded.'}, status=400)
+
+        file = request.FILES['file']
+        if not file.name.lower().endswith('.csv'):
+            return JsonResponse({'success': False, 'error': 'Invalid file type. Please upload a .csv file.'}, status=400)
+
+        # Define required and allowed headers
+        required_headers = {
+            'last_name', 'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'weight_kg'
+        }
+        # Need at least one of date_of_birth or age_years
+        date_or_age_headers = {'date_of_birth', 'age_years'}
+        allowed_headers = {
+            'last_name', 'first_name', 'email', 'telephone', 'address', 'owner_comments',
+            'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'date_of_birth', 'age_years', 'weight_kg'
+        }
+
+        total_record_count = 0
+        preview_rows = []
+        headers = []
+
+        try:
+            decoded_file = file.read().decode('utf-8-sig')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.reader(io_string)
+
+            # Read header
+            try:
+                headers = next(reader)
+                headers = [h.strip().lower() for h in headers]
+            except StopIteration:
+                 return JsonResponse({'success': False, 'error': 'CSV file is empty or contains only a header.'}, status=400)
+
+            # Validate Headers
+            actual_headers_set = set(headers)
+            if not required_headers.issubset(actual_headers_set):
+                missing = required_headers - actual_headers_set
+                return JsonResponse({'success': False, 'error': f'Missing required columns: {", ".join(missing)}.'}, status=400)
+
+            if not any(h in actual_headers_set for h in date_or_age_headers):
+                 return JsonResponse({'success': False, 'error': 'Missing required column: Must include either "date_of_birth" or "age_years".'}, status=400)
+
+            # Optional: Check for disallowed headers? For now, we just ignore extra columns during processing.
+
+            # Process rows: count all, preview first N
+            for i, row in enumerate(reader):
+                total_record_count += 1
+                if i < self.PREVIEW_ROW_COUNT:
+                    # Basic validation: check column count
+                    if len(row) != len(headers):
+                        return JsonResponse({'success': False, 'error': f'Row {i+2} has incorrect number of columns ({len(row)}). Expected {len(headers)}.'}, status=400)
+                    preview_rows.append(row)
+
+            # Check if any data rows were found
+            if total_record_count == 0:
+                 return JsonResponse({'success': False, 'error': 'CSV file contains only a header row.'}, status=400)
+
+            preview_data = {
+                'headers': headers, # Return the actual headers found in the file
+                'rows': preview_rows
+            }
+            return JsonResponse({
+                'success': True,
+                'preview': preview_data,
+                'total_records': total_record_count
+             })
+
+        except UnicodeDecodeError:
+             return JsonResponse({'success': False, 'error': 'File encoding error. Please ensure the file is UTF-8 encoded.'}, status=400)
+        except Exception as e:
+            print(f"Error during patient import preview: {e}") # Basic logging
+            return JsonResponse({'success': False, 'error': 'An unexpected error occurred while reading the file.'}, status=500)
+
+
+class PatientImportExecuteView(View):
+    def post(self, request, *args, **kwargs):
+        if 'file' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No file uploaded.'}, status=400)
+
+        file = request.FILES['file']
+        if not file.name.lower().endswith('.csv'):
+            return JsonResponse({'success': False, 'error': 'Invalid file type.'}, status=400)
+
+        import_comment = "<Patient and Owner data added through bulk import>"
+        created_owners = 0
+        updated_owners = 0
+        created_patients = 0
+        skipped_patients = 0
+        errors = []
+
+        # Cache species and breeds to reduce DB hits
+        species_cache = {s.code: s for s in Species.objects.all()}
+        breed_cache = {(b.species.code, b.name.lower()): b for b in Breed.objects.select_related('species').all()}
+        # Cache owners found/created during import to avoid repeated DB checks within the same file
+        owner_cache = {} # Key: (last_name_lower, first_name_lower, email_lower), Value: Owner instance
+
+        try:
+            decoded_file = file.read().decode('utf-8-sig')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+
+            # Normalize field names from the file header
+            reader.fieldnames = [name.strip().lower() for name in reader.fieldnames]
+            actual_headers = set(reader.fieldnames)
+
+            # Re-validate headers required for execution
+            required_headers = {'last_name', 'patient_name', 'species_code', 'breed_name', 'sex', 'intact', 'weight_kg'}
+            if not required_headers.issubset(actual_headers):
+                missing = required_headers - actual_headers
+                return JsonResponse({'success': False, 'error': f'Execution failed: Missing required columns: {", ".join(missing)}.'}, status=400)
+            if not ('date_of_birth' in actual_headers or 'age_years' in actual_headers):
+                return JsonResponse({'success': False, 'error': 'Execution failed: Missing required column (date_of_birth or age_years).'}, status=400)
+
+            patients_to_create = []
+            owners_to_update_fields = {} # owner_id: {field: value} - track updates for found owners
+            today = timezone.localdate() # Get today's date for age calculation
+
+            with transaction.atomic(): # Wrap the whole process in a transaction
+                for i, row in enumerate(reader):
+                    row_num = i + 2
+                    try:
+                        # --- 1. Extract and Validate Owner Data ---
+                        owner_ln = row.get('last_name', '').strip()
+                        owner_fn = row.get('first_name', '').strip()
+                        owner_em = row.get('email', '').strip()
+                        owner_tel = row.get('telephone', '').strip()
+                        owner_addr = row.get('address', '').strip()
+                        owner_comm = row.get('owner_comments', '').strip()
+
+                        if not owner_ln:
+                            errors.append(f"Row {row_num}: Missing required owner field: last_name.")
+                            continue
+
+                        # --- 2. Find or Prepare Owner ---
+                        owner_key = (owner_ln.lower(), owner_fn.lower(), owner_em.lower())
+                        owner = owner_cache.get(owner_key)
+                        owner_created_this_import = False
+
+                        if not owner:
+                            # Query DB using case-insensitive match
+                            filter_kwargs = {
+                                'last_name__iexact': owner_ln,
+                                'first_name__iexact': owner_fn or '',
+                                'email__iexact': owner_em or ''
+                            }
+                            try:
+                                owner = Owner.objects.get(**filter_kwargs)
+                                # Owner found in DB, potentially update fields
+                                update_needed = False
+                                if owner_tel and owner.telephone != owner_tel:
+                                    owners_to_update_fields.setdefault(owner.id, {})['telephone'] = owner_tel
+                                    update_needed = True
+                                if owner_addr and owner.address != owner_addr:
+                                     owners_to_update_fields.setdefault(owner.id, {})['address'] = owner_addr
+                                     update_needed = True
+                                # Append import comment if new comments provided
+                                if owner_comm and import_comment not in owner.comments:
+                                     new_comment = f"{owner.comments}\n{import_comment}\n{owner_comm}".strip()
+                                     owners_to_update_fields.setdefault(owner.id, {})['comments'] = new_comment
+                                     update_needed = True
+                                elif import_comment not in owner.comments: # Append import comment even if no new comment in file
+                                    new_comment = f"{owner.comments}\n{import_comment}".strip()
+                                    owners_to_update_fields.setdefault(owner.id, {})['comments'] = new_comment
+                                    update_needed = True
+
+                                if update_needed and owner.id not in owners_to_update_fields.get(owner.id, {}): # Check if we added fields
+                                     # Only count as updated if fields were actually added to the dict
+                                     # This logic might need refinement depending on how updates are counted
+                                     pass # Update count handled later
+
+                            except Owner.DoesNotExist:
+                                # Create new owner instance (don't save yet)
+                                owner_data = {
+                                    'last_name': owner_ln,
+                                    'first_name': owner_fn,
+                                    'email': owner_em,
+                                    'telephone': owner_tel,
+                                    'address': owner_addr,
+                                    'comments': f"{owner_comm}\n{import_comment}".strip()
+                                }
+                                owner = Owner(**owner_data)
+                                owner.save() # Save immediately to get an ID for the patient FK
+                                created_owners += 1
+                                owner_created_this_import = True
+                            except Owner.MultipleObjectsReturned:
+                                errors.append(f"Row {row_num}: Found multiple existing owners matching ({owner_ln}, {owner_fn}, {owner_em}). Skipping.")
+                                continue
+
+                            owner_cache[owner_key] = owner # Add found/created owner to cache
+
+                        # --- 3. Extract and Validate Patient Data ---
+                        patient_name = row.get('patient_name', '').strip()
+                        species_code = row.get('species_code', '').strip().upper()
+                        breed_name = row.get('breed_name', '').strip()
+                        sex = row.get('sex', '').strip().upper()
+                        intact_str = row.get('intact', '').strip().lower()
+                        dob_str = row.get('date_of_birth', '').strip()
+                        age_str = row.get('age_years', '').strip()
+                        weight_str = row.get('weight_kg', '').strip()
+
+                        # Required patient fields check
+                        if not all([patient_name, species_code, breed_name, sex, intact_str, weight_str]):
+                            errors.append(f"Row {row_num}: Missing required patient field(s) (name, species, breed, sex, intact, weight).")
+                            continue
+                        if not dob_str and not age_str:
+                             errors.append(f"Row {row_num}: Missing required patient field (date_of_birth or age_years).")
+                             continue
+
+                        # --- 4. Process Patient Fields ---
+                        # Species
+                        species = species_cache.get(species_code)
+                        if not species:
+                            # Try creating species if not found? Or error out? Let's error for now.
+                            errors.append(f"Row {row_num}: Species code '{species_code}' not found in database.")
+                            continue
+                            # Alternative: Create on the fly
+                            # try:
+                            #     species = Species.objects.create(code=species_code)
+                            #     species_cache[species_code] = species
+                            # except IntegrityError:
+                            #     errors.append(f"Row {row_num}: Error creating new species '{species_code}'.")
+                            #     continue
+
+                        # Breed
+                        breed_key = (species_code, breed_name.lower())
+                        breed = breed_cache.get(breed_key)
+                        if not breed:
+                             # Try finding case-insensitive first, then create if not found
+                            try:
+                                breed = Breed.objects.get(species=species, name__iexact=breed_name)
+                                breed_cache[breed_key] = breed # Add found breed to cache
+                            except Breed.DoesNotExist:
+                                # Create new breed
+                                try:
+                                    breed = Breed.objects.create(species=species, name=breed_name)
+                                    breed_cache[breed_key] = breed
+                                except IntegrityError:
+                                     errors.append(f"Row {row_num}: Error creating new breed '{breed_name}' for species '{species_code}'.")
+                                     continue
+
+                        # Sex
+                        if sex not in ['M', 'F', 'U']: # Assuming U for Unknown/Unspecified
+                             errors.append(f"Row {row_num}: Invalid value for sex '{sex}'. Use M, F, or U.")
+                             continue
+
+                        # Intact (Handle variations: true/false, yes/no, 1/0)
+                        intact = None
+                        if intact_str in ['true', 'yes', '1']: intact = True
+                        elif intact_str in ['false', 'no', '0']: intact = False
+                        else:
+                            errors.append(f"Row {row_num}: Invalid value for intact '{intact_str}'. Use true/false, yes/no, or 1/0.")
+                            continue
+
+                         # Weight
+                        try:
+                            weight_kg = float(weight_str)
+                            if weight_kg < 0: raise ValueError("Weight cannot be negative")
+                        except ValueError:
+                             errors.append(f"Row {row_num}: Invalid numeric value for weight_kg '{weight_str}'.")
+                             continue
+
+                        # Date of Birth / Age
+                        dob = None
+                        if dob_str:
+                            try:
+                                dob = datetime.strptime(dob_str, '%Y-%m-%d').date()
+                            except ValueError:
+                                # If DOB format is invalid, check if age is provided
+                                if age_str:
+                                     try:
+                                         age_years = float(age_str)
+                                         if age_years < 0: raise ValueError("Age cannot be negative")
+                                         # Calculate approximate DOB based on age
+                                         dob = today - timezone.timedelta(days=age_years * 365.25)
+                                     except ValueError:
+                                         errors.append(f"Row {row_num}: Invalid date_of_birth '{dob_str}' AND invalid numeric age_years '{age_str}'.")
+                                         continue
+                                else:
+                                    # DOB invalid, no age provided
+                                    errors.append(f"Row {row_num}: Invalid format for date_of_birth '{dob_str}'. Expected YYYY-MM-DD.")
+                                    continue
+                        elif age_str: # No DOB provided, use age
+                             try:
+                                age_years = float(age_str)
+                                if age_years < 0: raise ValueError("Age cannot be negative")
+                                dob = today - timezone.timedelta(days=age_years * 365.25)
+                             except ValueError:
+                                 errors.append(f"Row {row_num}: Invalid numeric value for age_years '{age_str}'.")
+                                 continue
+                        else:
+                             # Should have been caught earlier, but defensively check
+                             errors.append(f"Row {row_num}: Missing date_of_birth or age_years.")
+                             continue
+
+                        # --- 5. Check Patient Uniqueness ---
+                        # Unique based on owner, name (case-insensitive), species, breed, dob
+                        patient_filter = {
+                            'owner': owner,
+                            'name__iexact': patient_name,
+                            'species': species,
+                            'breed': breed,
+                            'date_of_birth': dob
+                        }
+                        if Patient.objects.filter(**patient_filter).exists():
+                            skipped_patients += 1
+                            # Optional: Add to errors if you want to report skipped duplicates
+                            # errors.append(f"Row {row_num}: Skipped duplicate patient record.")
+                            continue
+
+                        # --- 6. Prepare Patient for Bulk Create ---
+                        patient_data = {
+                             'owner': owner,
+                             'name': patient_name,
+                             'species': species,
+                             'breed': breed,
+                             'sex': sex,
+                             'intact': intact,
+                             'date_of_birth': dob,
+                             'weight': weight_kg,
+                         }
+                        patients_to_create.append(Patient(**patient_data))
+
+                    except Exception as e:
+                        # Catch unexpected errors during row processing
+                        errors.append(f"Row {row_num}: Unexpected error processing row: {e}")
+                        print(f"Row {row_num} Error: {e}") # Log the specific error
+
+                # --- End of row loop ---
+
+                # --- 7. Bulk Create Patients ---
+                if patients_to_create:
+                    try:
+                        Patient.objects.bulk_create(patients_to_create)
+                        created_patients = len(patients_to_create)
+                    except Exception as e:
+                        # If bulk create fails, the transaction should roll back owners created in this run
+                        print(f"Patient bulk create error: {e}")
+                        raise IntegrityError(f"Database error during patient bulk import: {e}") # Reraise to trigger rollback
+
+                # --- 8. Bulk Update Owners (outside the main loop) ---
+                owners_to_batch_update = []
+                updated_owner_ids = set()
+                for owner_id, fields_to_update in owners_to_update_fields.items():
+                    if fields_to_update: # Only update if there are changes
+                        owner_instance = Owner.objects.get(pk=owner_id) # Fetch instance again
+                        for field, value in fields_to_update.items():
+                             setattr(owner_instance, field, value)
+                        owners_to_batch_update.append(owner_instance)
+                        updated_owner_ids.add(owner_id)
+
+                if owners_to_batch_update:
+                    try:
+                        Owner.objects.bulk_update(owners_to_batch_update, ['telephone', 'address', 'comments'])
+                        updated_owners = len(updated_owner_ids)
+                    except Exception as e:
+                         print(f"Owner bulk update error: {e}")
+                         # Don't necessarily rollback everything if only owner update fails,
+                         # but report it as an error. Patients might already be created.
+                         errors.append(f"Warning: Failed to update some existing owner records: {e}")
+
+
+            # --- Transaction committed successfully here ---
+
+            # --- 9. Prepare Response ---
+            response_message = f"Import finished. Created: {created_patients} patients."
+            if created_owners > 0:
+                response_message += f" Created {created_owners} new owners."
+            if updated_owners > 0:
+                 response_message += f" Updated {updated_owners} existing owners."
+            if skipped_patients > 0:
+                response_message += f" Skipped: {skipped_patients} duplicate/existing patients."
+
+            if errors:
+                error_summary = "\n".join(errors[:20]) # Show more errors for patient import
+                if len(errors) > 20:
+                    error_summary += f"\n...and {len(errors) - 20} more errors."
+                # Consider success=False if *any* errors occurred, even if some imports succeeded.
+                return JsonResponse({
+                    'success': False, # Indicate partial failure/errors
+                    'error': f'{response_message}\n\nErrors/Warnings found:\n{error_summary}',
+                    'created_patients': created_patients,
+                    'created_owners': created_owners,
+                    'updated_owners': updated_owners,
+                    'skipped_patients': skipped_patients
+                }, status=400) # Bad request due to data errors
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'message': response_message,
+                    'created_patients': created_patients,
+                    'created_owners': created_owners,
+                    'updated_owners': updated_owners,
+                    'skipped_patients': skipped_patients
+                })
+
+        except UnicodeDecodeError:
+             return JsonResponse({'success': False, 'error': 'File encoding error. Please ensure the file is UTF-8 encoded.'}, status=400)
+        except IntegrityError as db_error: # Catch transaction rollback errors
+             return JsonResponse({'success': False, 'error': f'Database error during import: {db_error}. Import cancelled.'}, status=500)
+        except Exception as e:
+            print(f"Error during patient import execute: {e}")
+            import traceback
+            traceback.print_exc() # Print full traceback for debugging
+            return JsonResponse({'success': False, 'error': f'An unexpected server error occurred: {e}'}, status=500)

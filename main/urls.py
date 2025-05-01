@@ -33,4 +33,9 @@ urlpatterns = [
     path('api/patients/<int:pk>/', views.PatientDetailView.as_view(), name='patient-detail'),
     path('api/patients/<int:pk>/update/', views.PatientCreateUpdateView.as_view(), name='patient-update'),
     path('api/patients/<int:pk>/delete/', views.PatientDeleteView.as_view(), name='patient-delete'),
+
+    # URLs for Patient Import
+    path('manage/patients/import/template/', views.PatientImportTemplateView.as_view(), name='patient-import-template'),
+    path('manage/patients/import/preview/', views.PatientImportPreviewView.as_view(), name='patient-import-preview'),
+    path('manage/patients/import/execute/', views.PatientImportExecuteView.as_view(), name='patient-import-execute'),
 ]

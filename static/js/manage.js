@@ -10,6 +10,9 @@ const manageApp = Vue.createApp({
             speciesDeleteUrlBase: '', // e.g., /api/species/
             breedListCreateUrl: '',
             breedDeleteUrlBase: '', // e.g., /api/breeds/
+            patientTemplateDownloadUrl: '',
+            patientImportPreviewUrl: '',
+            patientImportExecuteUrl: '',
 
             // Import Modal State
             isImportModalOpen: false,
@@ -24,6 +27,15 @@ const manageApp = Vue.createApp({
             importedCount: 0,
             skippedCount: 0,
             skippedRowsInfo: [],
+
+            // Patient Import Modal State (Similar to Owner Import)
+            isPatientImportModalOpen: false,
+            patientImportFile: null,
+            patientValidationErrors: [],
+            patientPreviewData: [],
+            patientTotalRecords: 0,
+            patientPreviewHeaders: [],
+            isProcessingPatientImport: false,
 
             // Notification State
             notification: {
@@ -66,6 +78,9 @@ const manageApp = Vue.createApp({
         canImport() {
             return this.importFile && this.validationErrors.length === 0 && !this.isProcessingImport;
         },
+        canImportPatient() {
+             return this.patientImportFile && this.patientValidationErrors.length === 0 && !this.isProcessingPatientImport;
+        },
          requiredFields() {
              // This doesn't depend on config, keep as is
              return [
@@ -76,6 +91,27 @@ const manageApp = Vue.createApp({
                  { name: 'address', type: 'Text', required: false },
                  { name: 'comments', type: 'Text', required: false },
                  { name: 'created_at', type: 'DateTime (YYYY-MM-DD HH:MM:SS)', required: false },
+             ];
+        },
+        patientRequiredFields() {
+            // Describes the columns for the patient+owner import template
+             return [
+                 // Owner Fields
+                 { name: 'last_name', type: 'Text', required: 'always' },
+                 { name: 'first_name', type: 'Text', required: 'conditional' }, // Required if owner is new
+                 { name: 'email', type: 'Email', required: 'conditional' }, // Required if owner is new
+                 { name: 'telephone', type: 'Text', required: 'optional' },
+                 { name: 'address', type: 'Text', required: 'optional' },
+                 { name: 'owner_comments', type: 'Text', required: 'optional' },
+                 // Patient Fields
+                 { name: 'patient_name', type: 'Text', required: 'always' },
+                 { name: 'species_code', type: 'Text (Existing)', required: 'always' },
+                 { name: 'breed_name', type: 'Text (Creates if new)', required: 'always' },
+                 { name: 'sex', type: 'M / F / U', required: 'always' },
+                 { name: 'intact', type: 'true / false', required: 'always' },
+                 { name: 'date_of_birth', type: 'YYYY-MM-DD', required: 'either', eitherField: 'age_years' },
+                 { name: 'age_years', type: 'Number', required: 'either', eitherField: 'date_of_birth' },
+                 { name: 'weight_kg', type: 'Number', required: 'always' },
              ];
         },
     },
@@ -91,11 +127,15 @@ const manageApp = Vue.createApp({
                 this.speciesDeleteUrlBase = appElement.dataset.speciesDeleteUrlBase; // Base URL only
                 this.breedListCreateUrl = appElement.dataset.breedListCreateUrl;
                 this.breedDeleteUrlBase = appElement.dataset.breedDeleteUrlBase; // Base URL only
+                this.patientTemplateDownloadUrl = appElement.dataset.patientImportTemplateUrl;
+                this.patientImportPreviewUrl = appElement.dataset.patientImportPreviewUrl;
+                this.patientImportExecuteUrl = appElement.dataset.patientImportExecuteUrl;
 
                 // Basic check if URLs seem loaded
-                if (!this.csrfToken || !this.templateDownloadUrl || !this.ownerImportPreviewUrl || !this.ownerImportExecuteUrl || !this.speciesListCreateUrl || !this.speciesDeleteUrlBase || !this.breedListCreateUrl || !this.breedDeleteUrlBase) {
+                 if (!this.csrfToken || !this.templateDownloadUrl || !this.ownerImportPreviewUrl || !this.ownerImportExecuteUrl || !this.speciesListCreateUrl || !this.speciesDeleteUrlBase || !this.breedListCreateUrl || !this.breedDeleteUrlBase || !this.patientTemplateDownloadUrl || !this.patientImportPreviewUrl || !this.patientImportExecuteUrl) {
                      console.warn("Manage App: Some config URLs might be missing from data attributes.");
-                }
+                     // Consider showing a more specific error
+                 }
             } else {
                 console.error("Manage App: Could not read config from #manage-app data attributes.");
                 // Optionally display an error to the user
@@ -261,6 +301,144 @@ const manageApp = Vue.createApp({
             })
             .finally(() => {
                 this.isProcessingImport = false;
+            });
+        },
+
+        // --- Patient Import Methods ---
+        openPatientImportModal() {
+            this.isPatientImportModalOpen = true;
+            this.patientImportFile = null;
+            this.patientValidationErrors = [];
+            this.patientPreviewData = [];
+            this.patientTotalRecords = 0;
+            this.patientPreviewHeaders = [];
+            this.isProcessingPatientImport = false;
+            this.clearNotification();
+            const fileInput = document.getElementById('patient-file-upload');
+            if (fileInput) fileInput.value = ''; // Reset file input visually
+            this.$nextTick(() => {
+                // Focus the file input or the first button in the modal
+                this.$refs.patientImportModal?.querySelector('#patient-file-upload, button')?.focus();
+            });
+        },
+        closePatientImportModal() {
+            this.isPatientImportModalOpen = false;
+        },
+        handlePatientFileChange(event) {
+            const fileInput = event.target;
+            this.patientImportFile = fileInput.files[0];
+            this.patientValidationErrors = [];
+            this.patientPreviewData = [];
+            this.patientTotalRecords = 0;
+            this.patientPreviewHeaders = [];
+            this.isProcessingPatientImport = false; // Reset processing state
+            this.clearNotification();
+            if (this.patientImportFile) {
+                this.validateAndPreviewPatientFile();
+            } else {
+                // Clear preview if file is removed
+                this.patientPreviewData = [];
+                this.patientPreviewHeaders = [];
+                this.patientTotalRecords = 0;
+            }
+        },
+        validateAndPreviewPatientFile() {
+            if (!this.patientImportFile) return;
+            // Basic file type check (client-side)
+            if (this.patientImportFile.type !== 'text/csv' && !this.patientImportFile.name.toLowerCase().endsWith('.csv')) {
+                this.patientValidationErrors = ['Invalid file type. Please upload a CSV file.'];
+                this.patientImportFile = null;
+                const fileInput = document.getElementById('patient-file-upload');
+                if (fileInput) fileInput.value = '';
+                return;
+            }
+
+            this.isProcessingPatientImport = true;
+            this.patientValidationErrors = [];
+            this.patientPreviewData = [];
+            this.patientTotalRecords = 0;
+            this.patientPreviewHeaders = [];
+
+            let formData = new FormData();
+            formData.append('file', this.patientImportFile);
+
+            axios.post(this.patientImportPreviewUrl, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'X-CSRFToken': this.csrfToken
+                }
+            })
+            .then(response => {
+                if (response.data.success && response.data.preview && response.data.preview.headers && response.data.preview.rows) {
+                    this.patientPreviewHeaders = response.data.preview.headers;
+                    this.patientPreviewData = response.data.preview.rows;
+                    this.patientTotalRecords = response.data.total_records || 0;
+                } else {
+                     // Use errors array if provided, otherwise fall back to single error message
+                    const errors = response.data.errors || (response.data.error ? [response.data.error] : ['Preview failed.']);
+                    this.patientValidationErrors = Array.isArray(errors) ? errors : [errors]; // Ensure it's an array
+                    this.patientImportFile = null;
+                    const fileInput = document.getElementById('patient-file-upload');
+                    if (fileInput) fileInput.value = '';
+                }
+            })
+            .catch(error => {
+                console.error("Patient Preview Error:", error);
+                let msg = 'An unexpected error occurred during preview.';
+                if (error.response && error.response.data && (error.response.data.error || error.response.data.errors)) {
+                     const backendError = error.response.data.error || (Array.isArray(error.response.data.errors) ? error.response.data.errors.join('; ') : 'Preview failed.');
+                     msg = `Preview Error: ${backendError}`;
+                }
+                this.patientValidationErrors = [msg];
+                this.patientImportFile = null;
+                const fileInput = document.getElementById('patient-file-upload');
+                if (fileInput) fileInput.value = '';
+            })
+            .finally(() => {
+                this.isProcessingPatientImport = false;
+            });
+        },
+        confirmPatientImport() {
+            if (!this.canImportPatient) return;
+            this.isProcessingPatientImport = true;
+            // Keep validation errors from preview if any, or clear for execution feedback
+            // this.patientValidationErrors = [];
+            this.clearNotification();
+
+            let formData = new FormData();
+            formData.append('file', this.patientImportFile);
+
+            axios.post(this.patientImportExecuteUrl, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'X-CSRFToken': this.csrfToken
+                }
+            })
+            .then(response => {
+                if (response.data.success) {
+                     // Use the detailed message from backend
+                    this.showNotification(response.data.message || 'Import successful.', 'success');
+                    this.closePatientImportModal();
+                } else {
+                     // Display errors from the backend execution attempt
+                    let errorMsg = response.data.error || 'Import failed due to errors.';
+                    // Backend might send a detailed error string or an array of errors
+                    this.patientValidationErrors = response.data.error ? [response.data.error] : (response.data.errors || ['Import failed.']);
+                    this.showNotification(errorMsg, 'error', 0); // Show error persistently in banner
+                     // Keep modal open to show errors in context if possible (errors are displayed within modal)
+                }
+            })
+            .catch(error => {
+                console.error("Patient Import Execute Error:", error);
+                let errorMsg = 'An unexpected error occurred during import.';
+                if (error.response && error.response.data && (error.response.data.error || error.response.data.errors)) {
+                     errorMsg = error.response.data.error || (Array.isArray(error.response.data.errors) ? error.response.data.errors.join('; ') : 'Import failed.');
+                }
+                this.patientValidationErrors = [errorMsg]; // Show error in modal
+                this.showNotification(errorMsg, 'error', 0); // Also show in banner
+            })
+            .finally(() => {
+                this.isProcessingPatientImport = false;
             });
         },
 

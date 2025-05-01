@@ -70,8 +70,15 @@ const ownerApp = Vue.createApp({
         formatDate(isoString) {
             if (!isoString) return '';
             try {
-                // Extract YYYY-MM-DD part
-                return isoString.split('T')[0];
+                // Display date and time, e.g., "YYYY-MM-DD HH:MM"
+                const date = new Date(isoString);
+                 if (isNaN(date.getTime())) {
+                     throw new Error("Invalid Date"); // Handle invalid date strings
+                 }
+                const formattedDate = date.toISOString().split('T')[0];
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${formattedDate} ${hours}:${minutes}`;
             } catch (e) {
                 console.error("Error formatting date:", isoString, e);
                 return isoString; // Return original string on error

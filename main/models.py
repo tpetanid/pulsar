@@ -38,3 +38,28 @@ class Breed(models.Model):
 
     def __str__(self):
         return f"{self.species.code} - {self.name}"
+
+# --- Patient Model --- #
+
+class Patient(models.Model):
+    SEX_CHOICES = [
+        ('M', 'Male'),
+        ('F', 'Female'),
+    ]
+
+    owner = models.ForeignKey(Owner, on_delete=models.CASCADE, related_name="patients")
+    name = models.CharField(max_length=100)
+    species = models.ForeignKey(Species, on_delete=models.PROTECT) # Protect species from deletion if patients exist
+    breed = models.ForeignKey(Breed, on_delete=models.PROTECT) # Protect breed from deletion if patients exist
+    sex = models.CharField(max_length=1, choices=SEX_CHOICES)
+    intact = models.BooleanField() # True if intact, False if neutered/spayed
+    date_of_birth = models.DateField()
+    weight = models.DecimalField(max_digits=5, decimal_places=2, help_text="Weight in kilograms") # e.g., 999.99 kg
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.species.code} - {self.breed.name})"
+
+    class Meta:
+        ordering = ['owner__last_name', 'owner__first_name', 'name'] # Default ordering

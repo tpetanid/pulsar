@@ -25,4 +25,12 @@ urlpatterns = [
     # Breed API
     path('api/breeds/', views.BreedListCreateView.as_view(), name='breed-list-create'), # Handles GET (list) & POST (create)
     path('api/breeds/<int:pk>/', views.BreedDeleteView.as_view(), name='breed-delete'),   # Handles DELETE
+
+    # Patient URLs
+    path('patients/', views.PatientListView.as_view(), name='patient-list'),
+    path('api/patients/', views.PatientListAPIView.as_view(), name='patient-list-api'),
+    path('api/patients/create/', views.PatientCreateUpdateView.as_view(), name='patient-create'),
+    path('api/patients/<int:pk>/', views.PatientDetailView.as_view(), name='patient-detail'),
+    path('api/patients/<int:pk>/update/', views.PatientCreateUpdateView.as_view(), name='patient-update'),
+    path('api/patients/<int:pk>/delete/', views.PatientDeleteView.as_view(), name='patient-delete'),
 ]

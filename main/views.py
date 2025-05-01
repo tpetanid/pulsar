@@ -17,8 +17,8 @@ from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import Owner, Species, Breed
-from .forms import OwnerForm
+from .models import Owner, Species, Breed, Patient
+from .forms import OwnerForm, PatientForm
 
 # Create your views here.
 def home(request):
@@ -397,6 +397,211 @@ class OwnerImportExecuteView(View):
         except Exception as e:
             print(f"Error during execute: {e}")
             return JsonResponse({'success': False, 'error': 'An unexpected error occurred while importing the file.'}, status=500)
+
+# ==========================
+# Patient Views & API
+# ==========================
+
+# View to render the patient list page structure
+class PatientListView(ListView):
+    model = Patient
+    template_name = 'patient_list.html'
+    # Vue app will handle data fetching
+
+# API View for Paginated Patients
+class PatientListAPIView(View):
+    DEFAULT_PER_PAGE = 20
+    MAX_PER_PAGE = 100
+    # Default fields to search (add more as needed)
+    DEFAULT_FILTER_FIELDS = ['name', 'owner__last_name', 'owner__first_name', 'species__code', 'breed__name']
+    ALLOWED_SORT_FIELDS = {
+        'name', 'owner__last_name', 'species__code', 'breed__name',
+        'sex', 'intact', 'date_of_birth', 'updated_at',
+        # Add aliases if needed, e.g., 'owner' : 'owner__last_name'
+    }
+    DEFAULT_SORT_FIELD = 'updated_at'
+
+    def get(self, request, *args, **kwargs):
+        # --- Parameter Parsing (Page, Per Page) ---
+        try:
+            page = int(request.GET.get('page', 1))
+            per_page = int(request.GET.get('per_page', self.DEFAULT_PER_PAGE))
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid page or per_page parameter.'}, status=400)
+
+        if per_page <= 0: per_page = self.DEFAULT_PER_PAGE
+        elif per_page > self.MAX_PER_PAGE: per_page = self.MAX_PER_PAGE
+
+        # --- Parameter Parsing (Minimal Owner List for Dropdown) ---
+        minimal_owner_list = request.GET.get('minimal', 'false').lower() == 'true'
+        if minimal_owner_list:
+            # Override sorting/pagination for minimal list if needed
+            owners_qs = Owner.objects.order_by('last_name', 'first_name')
+            owners_data = list(owners_qs.values('id', 'last_name', 'first_name', 'email')) # Only required fields
+            return JsonResponse({'success': True, 'results': owners_data}) # Return only results
+
+        # --- Parameter Parsing (Filtering) ---
+        query = request.GET.get('query', '').strip()
+        filter_fields = request.GET.getlist('filter_fields')
+        if not filter_fields:
+            filter_fields = self.DEFAULT_FILTER_FIELDS
+        
+        # Validate filter_fields against allowed fields
+        valid_filter_fields = [f for f in filter_fields if f in self.DEFAULT_FILTER_FIELDS]
+        if not valid_filter_fields and query:
+            valid_filter_fields = self.DEFAULT_FILTER_FIELDS
+
+        # --- Parameter Parsing (Sorting) ---
+        sort_field = request.GET.get('sort', self.DEFAULT_SORT_FIELD).lower()
+        sort_direction = request.GET.get('direction', 'desc').lower()
+        
+        if sort_field not in self.ALLOWED_SORT_FIELDS:
+            sort_field = self.DEFAULT_SORT_FIELD
+        if sort_direction not in ['asc', 'desc']:
+            sort_direction = 'desc'
+
+        # --- Base Queryset & Prefetching ---
+        patient_queryset = Patient.objects.select_related('owner', 'species', 'breed').all()
+
+        # --- Apply Filters ---
+        if query and valid_filter_fields:
+            q_objects = Q()
+            for field_name in valid_filter_fields:
+                q_objects |= Q(**{f'{field_name}__icontains': query})
+            patient_queryset = patient_queryset.filter(q_objects)
+
+        # --- Apply Sorting ---
+        # Handle related field sorting (owner__last_name requires secondary sort on first_name)
+        order_by_list = []
+        sort_prefix = '-' if sort_direction == 'desc' else ''
+
+        if sort_field == 'owner__last_name':
+            order_by_list.append(f"{sort_prefix}owner__last_name")
+            order_by_list.append(f"{sort_prefix}owner__first_name") # Secondary sort for owner name
+            order_by_list.append(f"{sort_prefix}name") # Tertiary sort by patient name
+        else:
+            order_by_list.append(f"{sort_prefix}{sort_field}")
+        
+        # Add pk for stable pagination
+        if 'pk' not in [f.lstrip('-') for f in order_by_list]:
+            order_by_list.append('pk')
+
+        patient_queryset = patient_queryset.order_by(*order_by_list)
+
+        # --- Paginate ---
+        paginator = Paginator(patient_queryset, per_page)
+        try:
+            patients_page = paginator.page(page)
+        except PageNotAnInteger:
+            patients_page = paginator.page(1)
+            page = 1
+        except EmptyPage:
+            patients_page = paginator.page(paginator.num_pages)
+            page = paginator.num_pages
+        
+        # Check if requested page is valid after filtering
+        if page > paginator.num_pages:
+            page = paginator.num_pages if paginator.num_pages > 0 else 1
+            patients_page = paginator.page(page)
+
+        # --- Serialize Results ---
+        results = []
+        for patient in patients_page.object_list:
+            results.append({
+                'id': patient.id,
+                'name': patient.name,
+                'owner_id': patient.owner.id,
+                'owner_name': f"{patient.owner.first_name or ''} {patient.owner.last_name}".strip(),
+                'species_code': patient.species.code,
+                'breed_id': patient.breed.id,
+                'breed_name': patient.breed.name,
+                'sex': patient.sex,
+                'intact': patient.intact,
+                'date_of_birth': patient.date_of_birth.isoformat() if patient.date_of_birth else None,
+                'weight': str(patient.weight) if patient.weight is not None else None, # Send as string
+                'created_at': patient.created_at.isoformat() if patient.created_at else None,
+                'updated_at': patient.updated_at.isoformat() if patient.updated_at else None,
+            })
+
+        # --- Prepare JSON Response ---
+        data = {
+            'success': True,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': paginator.num_pages,
+            'total_patients': paginator.count, # Changed
+            'has_previous': patients_page.has_previous(),
+            'has_next': patients_page.has_next(),
+            'results': results,
+        }
+        return JsonResponse(data)
+
+# View to handle Patient Create/Update via AJAX
+class PatientCreateUpdateView(View):
+    def post(self, request, pk=None):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'errors': {'__all__': 'Invalid JSON format'}}, status=400)
+        
+        # We need to transform species code back to Species instance for the form
+        species_code = data.get('species')
+        if species_code:
+            try:
+                data['species'] = Species.objects.get(code=species_code)
+            except Species.DoesNotExist:
+                 return JsonResponse({'success': False, 'errors': {'species': [f'Invalid species code: {species_code}']}}, status=400)
+        # Breed should be passed as ID from frontend, so no transformation needed for the form
+        # Owner should be passed as ID from frontend
+
+        if pk:
+            patient = get_object_or_404(Patient, pk=pk)
+            form = PatientForm(data, instance=patient)
+        else:
+            form = PatientForm(data)
+
+        if form.is_valid():
+            patient = form.save()
+            # Return the saved patient data (simplified for now, can expand)
+            return JsonResponse({'success': True, 'patient_id': patient.id})
+        else:
+            # Return form errors as JSON
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+# View to handle Patient Delete via AJAX
+class PatientDeleteView(View):
+     def post(self, request, pk):
+        patient = get_object_or_404(Patient, pk=pk)
+        try:
+            patient.delete()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            # Log error e
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+# View to get Patient details via AJAX (for pre-filling edit form)
+class PatientDetailView(View):
+     def get(self, request, pk):
+        patient = get_object_or_404(Patient.objects.select_related('owner', 'species', 'breed'), pk=pk)
+        # Return data in a format usable by the Vue form
+        data = {
+            'id': patient.id,
+            'owner': patient.owner.id, # Send owner ID
+            'name': patient.name,
+            'species': patient.species.code, # Send species code
+            'breed': patient.breed.id, # Send breed ID
+            'sex': patient.sex,
+            'intact': patient.intact,
+            'date_of_birth': patient.date_of_birth.isoformat() if patient.date_of_birth else None,
+            'weight': str(patient.weight) if patient.weight is not None else None,
+            # Include related names if needed by view modal (though Vue can format)
+            'owner_name': f"{patient.owner.first_name or ''} {patient.owner.last_name}".strip(),
+            'species_code': patient.species.code,
+            'breed_name': patient.breed.name,
+            'created_at': patient.created_at.isoformat() if patient.created_at else None,
+            'updated_at': patient.updated_at.isoformat() if patient.updated_at else None,
+        }
+        return JsonResponse(data)
 
 # ==========================
 # Species API Views

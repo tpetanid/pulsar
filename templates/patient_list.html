@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Patients - Vet Cardio App{% endblock title %}
+
+{% block extra_head %}
+    {# Tom Select CSS #}
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    {# Add specific styles for this page if needed #}
+    <style>
+        /* Basic styles for modal transition */
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+{% endblock extra_head %}
+
+{% block content %}
+    {# Add data attributes to pass config to JS #}
+    <div id="patient-app" class="py-8" 
+         data-csrf-token="{{ csrf_token }}"
+         data-list-api-url="{% url 'patient-list-api' %}"
+         data-create-api-url="{% url 'patient-create' %}"
+         data-detail-api-url-base="{% url 'patient-detail' pk=0 %}" {# Placeholder PK #}
+         data-update-api-url-base="{% url 'patient-update' pk=0 %}" {# Placeholder PK #}
+         data-delete-api-url-base="{% url 'patient-delete' pk=0 %}" {# Placeholder PK #}
+         data-species-list-url="{% url 'species-list-create' %}" {# URL for species list #}
+         data-breeds-by-species-url-base="{% url 'breed-list-create' %}?species_code=" {# Base URL for breeds, species code appended #}
+         data-owner-list-url="{% url 'owner-list-api' %}?minimal=true" {# URL for owner list (minimal data) #}
+         >
+
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold">Patients</h1>
+                <button @click="openCreateModal" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Add New Patient
+                </button>
+            </div>
+
+            {# --- Filter Controls --- #}
+            {# Container for Filter Toggle Button and Per Page Controls #}
+            <div class="flex justify-between items-center mb-2"> {# Adjusted margin #}
+                {# Button to toggle filter visibility - Styled as a button #}
+                <button @click="toggleFilters" 
+                        class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <span class="mr-1.5">[[ showFilters ? 'Hide Filters' : 'Show Filters' ]]</span>
+                    <span>[[ showFilters ? '&#x25B2;' : '&#x25BC;' ]]</span>
+                </button>
+
+                {# --- Per Page Selector (Moved Here) --- #}
+                <div class="flex items-center space-x-2"> {# Grouping div for right side #}
+                    <label for="per-page" class="text-sm font-medium text-gray-700">Show:</label>
+                    <select id="per-page" v-model.number="perPage" @change="changePerPage" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <span class="text-sm text-gray-600">([[ totalPatients ]] total patients)</span> {# Removed ml-4, using space-x-2 now #}
+                </div>
+            </div>
+
+            {# Filter Section - Conditionally rendered (remains below the toggle/per-page row) #}
+            <transition name="fade"> {# Optional: Add transition #}
+            <div v-if="showFilters" class="mb-4 p-4 bg-gray-50 rounded-md border border-gray-200 space-y-3"> {# Added mb-4 here #}
+                <div class="flex items-center space-x-4">
+                    <label for="search-query" class="text-sm font-medium text-gray-700">Search:</label> {# Changed text #}
+                    <input type="text" id="search-query" v-model.lazy="searchQuery" @keyup.enter="applyFilters"
+                           placeholder="Search patients or owners..."
+                           class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                    <button @click="applyFilters" class="text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-3 rounded">Apply</button>
+                    <button @click="clearFilters" v-if="searchQuery || selectedFilterFields.length !== filterFields.length" class="text-sm text-gray-600 hover:text-gray-900">Clear</button>
+                </div>
+                <div class="flex items-center space-x-2 flex-wrap">
+                    <span class="text-sm font-medium text-gray-700 mr-2">In fields:</span>
+                    <label v-for="field in filterFields" :key="field.value" class="inline-flex items-center mr-3 text-sm">
+                        <input type="checkbox" :value="field.value" v-model="selectedFilterFields" @change="applyFilters"
+                               class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50">
+                        <span class="ml-1.5 text-gray-700">[[ field.label ]]</span>
+                    </label>
+                </div>
+            </div>
+            </transition>
+            {# --- End Filter Controls --- #}
+
+            <!-- Loading Indicator -->
+            <div v-if="isLoading" class="text-center py-10">
+                <p class="text-gray-500">Loading patients...</p>
+                {# Optional: Add a spinner SVG or similar #}
+            </div>
+
+            <!-- Patients Table -->
+            <div v-else class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('name')">
+                                Name
+                                <span v-if="sortField === 'name'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('owner__last_name')">
+                                Owner
+                                <span v-if="sortField === 'owner__last_name'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('species__code')">
+                                Species
+                                <span v-if="sortField === 'species__code'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('breed__name')">
+                                Breed
+                                <span v-if="sortField === 'breed__name'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('sex')">
+                                Sex
+                                <span v-if="sortField === 'sex'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('intact')">
+                                Intact
+                                <span v-if="sortField === 'intact'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('date_of_birth')">
+                                Age
+                                <span v-if="sortField === 'date_of_birth'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('updated_at')">
+                                Last Modified
+                                <span v-if="sortField === 'updated_at'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
+                            </th>
+                            <th scope="col" class="relative px-6 py-3">
+                                <span class="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="patients.length === 0 && !isLoading">
+                             <td colspan="9" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No patients found.</td> {# Updated colspan #}
+                         </tr>
+                        <tr v-for="patient in patients" :key="patient.id">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <span @click="openViewModal(patient)" class="cursor-pointer hover:text-blue-600">
+                                    [[ patient.name ]]
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {# Display Owner Name (assuming API provides it) #}
+                                [[ patient.owner_name || '-' ]]
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ patient.species_code || '-' ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ patient.breed_name || '-' ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ formatSex(patient.sex) ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ formatIntact(patient.intact) ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ calculateAge(patient.date_of_birth) ]]</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">[[ formatDateTime(patient.updated_at) ]]</td> {# Use full datetime format maybe? #}
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button @click="openViewModal(patient)" class="text-gray-600 hover:text-gray-900 mr-3">View</button>
+                                <button @click="openEditModal(patient)" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                                <button @click="openDeleteModal(patient)" class="text-red-600 hover:text-red-900">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {# --- Pagination Controls (Same as owner_list) --- #}
+            <nav v-if="totalPages > 1 && !isLoading" class="mt-6 flex items-center justify-between border-t border-gray-200 px-4 sm:px-0">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button @click="goToPage(currentPage - 1)" :disabled="!hasPreviousPage" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Previous
+                    </button>
+                    <button @click="goToPage(currentPage + 1)" :disabled="!hasNextPage" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Next
+                    </button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing
+                            <span class="font-medium">[[ firstPatientIndex ]]</span>
+                            to
+                            <span class="font-medium">[[ lastPatientIndex ]]</span>
+                            of
+                            <span class="font-medium">[[ totalPatients ]]</span>
+                            results
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button @click="goToPage(currentPage - 1)" :disabled="!hasPreviousPage"
+                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="sr-only">Previous</span>
+                                &lt;
+                            </button>
+                            {# Consider adding page number links here if desired #}
+                            <button @click="goToPage(currentPage + 1)" :disabled="!hasNextPage"
+                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span class="sr-only">Next</span>
+                                &gt;
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </nav>
+
+        </div> {# End max-w-7xl wrapper #}
+
+        <!-- == Modals == -->
+
+        <!-- Create/Edit Patient Modal -->
+        <transition name="fade">
+        <div v-if="showCreateEditModal" ref="createEditModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none" >
+            <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">[[ modalTitle ]]</h3>
+                    <form @submit.prevent="savePatient" class="space-y-4 text-left">
+                        <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">[[ formErrors.non_field_errors.join(', ') ]]</div>
+                        
+                        {# --- Owner Selection --- #}
+                        <div>
+                            <label for="owner-select" class="block text-sm font-medium text-gray-700">Owner *</label>
+                            {# Tom Select will initialize on this #}
+                            <select id="owner-select" placeholder="Type to search owners..." required></select>
+                            <p v-if="formErrors.owner" class="mt-1 text-xs text-red-500">[[ formErrors.owner.join(', ') ]]</p>
+                        </div>
+
+                        {# --- Patient Name --- #}
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700">Patient Name *</label>
+                            <input type="text" v-model="patientForm.name" id="name" required
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.name, 'border-gray-300': !formErrors.name}">
+                            <p v-if="formErrors.name" class="mt-1 text-xs text-red-500">[[ formErrors.name.join(', ') ]]</p>
+                        </div>
+                        
+                        {# --- Species Selection --- #}
+                         <div>
+                            <label for="species" class="block text-sm font-medium text-gray-700">Species *</label>
+                             <select v-model="patientForm.species" id="species" required @change="fetchBreedsForSpecies"
+                                    class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    :class="{'border-red-500': formErrors.species, 'border-gray-300': !formErrors.species}">
+                                <option :value="null" disabled>Select Species</option>
+                                <option v-for="spec in availableSpecies" :key="spec.code" :value="spec.code">
+                                    [[ spec.code ]]
+                                </option>
+                            </select>
+                            <p v-if="formErrors.species" class="mt-1 text-xs text-red-500">[[ formErrors.species.join(', ') ]]</p>
+                        </div>
+
+                         {# --- Breed Selection (depends on Species) --- #}
+                          <div>
+                            <label for="breed-select" class="block text-sm font-medium text-gray-700">Breed *</label>
+                            {# Tom Select will initialize on this #}
+                            <select id="breed-select" placeholder="Select Species first..." required :disabled="!patientForm.species"></select>
+                            <p v-if="formErrors.breed" class="mt-1 text-xs text-red-500">[[ formErrors.breed.join(', ') ]]</p>
+                        </div>
+
+                        {# --- Sex Selection --- #}
+                         <div>
+                            <label for="sex" class="block text-sm font-medium text-gray-700">Sex *</label>
+                             <select v-model="patientForm.sex" id="sex" required
+                                    class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                    :class="{'border-red-500': formErrors.sex, 'border-gray-300': !formErrors.sex}">
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                            </select>
+                            <p v-if="formErrors.sex" class="mt-1 text-xs text-red-500">[[ formErrors.sex.join(', ') ]]</p>
+                        </div>
+                        
+                         {# --- Intact Checkbox --- #}
+                         <div class="flex items-start">
+                              <div class="flex items-center h-5">
+                                <input id="intact" name="intact" type="checkbox" v-model="patientForm.intact" 
+                                       class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                              </div>
+                              <div class="ml-3 text-sm">
+                                <label for="intact" class="font-medium text-gray-700">Intact (Unneutered/Unspayed)</label>
+                                 <p class="text-gray-500 text-xs">Check this box if the patient is intact.</p>
+                              </div>
+                               <p v-if="formErrors.intact" class="mt-1 text-xs text-red-500">[[ formErrors.intact.join(', ') ]]</p> {# Should ideally not have errors here #}
+                         </div>
+
+                        {# --- Age Input (Always Shown) --- #}
+                        <div>
+                            <label for="age_value" class="block text-sm font-medium text-gray-700">Age *</label>
+                            <div class="mt-1 flex space-x-2">
+                                <input type="number" v-model.number="patientForm.ageValue" id="age_value" required min="0" placeholder="e.g., 3"
+                                       class="block w-1/2 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                       :class="{'border-red-500': formErrors.ageValue || formErrors.date_of_birth, 'border-gray-300': !(formErrors.ageValue || formErrors.date_of_birth)}">
+                                <select v-model="patientForm.ageUnit" id="age_unit" required
+                                        class="block w-1/2 px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                        :class="{'border-red-500': formErrors.ageUnit || formErrors.date_of_birth, 'border-gray-300': !(formErrors.ageUnit || formErrors.date_of_birth)}">
+                                    <option value="days">Days</option>
+                                    <option value="weeks">Weeks</option>
+                                    <option value="months">Months</option>
+                                    <option value="years">Years</option>
+                                </select>
+                            </div>
+                            {# Show DOB error here as age is used to calculate it #}
+                             <p v-if="formErrors.date_of_birth" class="mt-1 text-xs text-red-500">[[ formErrors.date_of_birth.join(', ') ]]</p>
+                             {# Separate errors for value/unit if backend provides them #}
+                             <p v-if="formErrors.ageValue" class="mt-1 text-xs text-red-500">[[ formErrors.ageValue.join(', ') ]]</p>
+                             <p v-if="formErrors.ageUnit" class="mt-1 text-xs text-red-500">[[ formErrors.ageUnit.join(', ') ]]</p>
+                        </div>
+
+                        {# --- Weight --- #}
+                         <div>
+                            <label for="weight" class="block text-sm font-medium text-gray-700">Weight (kg) *</label>
+                            <input type="number" step="0.01" min="0" v-model.number="patientForm.weight" id="weight" required
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.weight, 'border-gray-300': !formErrors.weight}">
+                            <p v-if="formErrors.weight" class="mt-1 text-xs text-red-500">[[ formErrors.weight.join(', ') ]]</p>
+                        </div>
+
+                        <div class="items-center px-4 py-3">
+                            <button type="submit" :disabled="isSaving"
+                                    class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50">
+                                [[ isSaving ? 'Saving...' : 'Save' ]]
+                            </button>
+                            <button type="button" @click="closeModal"
+                                    class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+        <!-- Delete Confirmation Modal -->
+        <transition name="fade">
+        <div v-if="showDeleteModal" ref="deleteModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
+             <div @click.stop class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Delete Patient</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">Are you sure you want to delete patient "[[ currentPatient.name ]]"?</p>
+                         <p class="text-xs text-gray-400">(Owner: [[ currentPatient.owner_name ]])</p>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                         <button @click="deletePatientConfirm" :disabled="isDeleting"
+                                class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-50">
+                            [[ isDeleting ? 'Deleting...' : 'Delete' ]]
+                        </button>
+                        <button @click="closeModal"
+                                class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+        <!-- View Details Modal -->
+        <transition name="fade">
+        <div v-if="showViewModal && currentPatient" ref="viewModal" @click="closeModal" @keydown.escape="closeModal" tabindex="-1"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 outline-none">
+            <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 text-center mb-4">Patient Details</h3>
+                    <div class="space-y-3 text-left px-4">
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Name:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentPatient.name ]]</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Owner:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentPatient.owner_name || '-' ]]</p> {# Assumes owner_name is fetched #}
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Species:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentPatient.species_code || '-' ]]</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Breed:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentPatient.breed_name || '-' ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Sex:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ formatSex(currentPatient.sex) ]]</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Intact:</strong>
+                             <p class="mt-1 text-sm text-gray-900">[[ formatIntact(currentPatient.intact) ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Age:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ calculateAge(currentPatient.date_of_birth) ]]</p>
+                        </div>
+                        <div>
+                            <strong class="block text-sm font-medium text-gray-700">Weight:</strong>
+                            <p class="mt-1 text-sm text-gray-900">[[ currentPatient.weight ]] kg</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Created:</strong>
+                             <p class="mt-1 text-sm text-gray-900">[[ formatDateTime(currentPatient.created_at) ]]</p>
+                        </div>
+                         <div>
+                            <strong class="block text-sm font-medium text-gray-700">Last Updated:</strong>
+                             <p class="mt-1 text-sm text-gray-900">[[ formatDateTime(currentPatient.updated_at) ]]</p>
+                        </div>
+                    </div>
+                    <div class="items-center px-4 py-3 mt-4 text-right border-t border-gray-200">
+                         <button @click="openEditFromViewModal"
+                                class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                            Edit
+                        </button>
+                        <button @click="closeModal"
+                                class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </transition>
+
+    </div> {# End #patient-app #}
+{% endblock content %}
+
+{% block scripts %}
+    {# Load Vue and Axios from CDN (assuming they are not in base.html) #}
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    {# Tom Select JS #}
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    
+    {# Load the separated Vue app logic #}
+    <script src="{% static 'js/patient_list.js' %}"></script>
+{% endblock scripts %} 

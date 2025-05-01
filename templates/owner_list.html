@@ -67,7 +67,7 @@
                     <label for="search-query" class="text-sm font-medium text-gray-700">Search:</label> {# Changed text #}
                     <input type="text" id="search-query" v-model.lazy="searchQuery" @keyup.enter="applyFilters"
                            placeholder="Enter search term..."
-                           class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                           class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm px-3 py-2"> {# Added px-3 py-2 #}
                     <button @click="applyFilters" class="text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 py-1.5 px-3 rounded">Apply</button>
                     <button @click="clearFilters" v-if="searchQuery || selectedFilterFields.length !== filterFields.length" class="text-sm text-gray-600 hover:text-gray-900">Clear</button>
                 </div>
@@ -94,19 +94,19 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('last_name')">
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" @click="changeSort('last_name')">
                                 Name
                                 <span v-if="sortField === 'last_name'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
                             </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('email')">
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" @click="changeSort('email')">
                                 Email
                                 <span v-if="sortField === 'email'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
                             </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('telephone')">
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" @click="changeSort('telephone')">
                                 Telephone
                                 <span v-if="sortField === 'telephone'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
                             </th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="changeSort('updated_at')">
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" @click="changeSort('updated_at')">
                                 Last Modified
                                 <span v-if="sortField === 'updated_at'">[[ sortDirection === 'asc' ? '▲' : '▼' ]]</span>
                             </th>

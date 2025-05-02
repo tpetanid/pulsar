@@ -37,4 +37,8 @@ urlpatterns = [
     path('manage/patients/import/template/', views.PatientImportTemplateView.as_view(), name='patient-import-template'),
     path('manage/patients/import/preview/', views.PatientImportPreviewView.as_view(), name='patient-import-preview'),
     path('manage/patients/import/execute/', views.PatientImportExecuteView.as_view(), name='patient-import-execute'),
+
+    # Case URLs
+    path('cases/create/', views.CreateCaseView.as_view(), name='case-create-page'), # Page to render the Vue app
+    path('api/cases/create/', views.CaseCreateAPIView.as_view(), name='case-create-api'), # API endpoint for saving cases
 ]

@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 # Create your models here.
 
@@ -63,3 +64,22 @@ class Patient(models.Model):
 
     class Meta:
         ordering = ['owner__last_name', 'owner__first_name', 'name'] # Default ordering
+
+# --- Case Model --- #
+
+class Case(models.Model):
+    owner = models.ForeignKey(Owner, on_delete=models.CASCADE, related_name="cases")
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="cases")
+    case_date = models.DateField(default=timezone.now, help_text="Date of the visit/case.")
+    complaint = models.TextField(blank=True, help_text="Primary reason for the visit/consultation.")
+    history = models.TextField(blank=True, help_text="Relevant medical history for this case.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Case for {self.patient.name} ({self.owner.last_name}) - {self.case_date.strftime('%Y-%m-%d')}"
+
+    class Meta:
+        ordering = ['-case_date', '-updated_at'] # Order by case date first, then updated_at
+
+# Make sure to run makemigrations and migrate after adding the model

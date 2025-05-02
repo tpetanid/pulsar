@@ -17,8 +17,8 @@ from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import Owner, Species, Breed, Patient
-from .forms import OwnerForm, PatientForm
+from .models import Owner, Species, Breed, Patient, Case
+from .forms import OwnerForm, PatientForm, CaseForm
 
 # Create your views here.
 def home(request):
@@ -1255,3 +1255,55 @@ class PatientImportExecuteView(View):
             import traceback
             traceback.print_exc() # Print full traceback for debugging
             return JsonResponse({'success': False, 'error': f'An unexpected server error occurred: {e}'}, status=500)
+
+# ==========================
+# Case Views & API
+# ==========================
+
+# View to render the case creation page structure
+class CreateCaseView(View):
+    def get(self, request, *args, **kwargs):
+        # This view just renders the template. Vue.js will handle the interactions.
+        return render(request, 'case_create.html')
+
+# API View for creating a new Case
+class CaseCreateAPIView(View):
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'errors': {'__all__': 'Invalid JSON format'}}, status=400)
+
+        # Basic check for required IDs (although form also checks relationships)
+        owner_id = data.get('owner')
+        patient_id = data.get('patient')
+
+        if not owner_id or not patient_id:
+            return JsonResponse({'success': False, 'errors': {'__all__': 'Owner and Patient are required.'}}, status=400)
+
+        # Validate Owner and Patient exist (optional but good practice)
+        try:
+            Owner.objects.get(pk=owner_id)
+        except Owner.DoesNotExist:
+             return JsonResponse({'success': False, 'errors': {'owner': ['Invalid Owner ID.']}}, status=400)
+        try:
+            # Important: Ensure the patient belongs to the specified owner
+            patient = Patient.objects.get(pk=patient_id, owner_id=owner_id)
+        except Patient.DoesNotExist:
+             return JsonResponse({'success': False, 'errors': {'patient': ['Invalid Patient ID for the selected Owner.']}}, status=400)
+
+        # Instantiate the form with the data
+        form = CaseForm(data)
+
+        if form.is_valid():
+            try:
+                case = form.save()
+                # Optionally return more case details if needed by the frontend
+                return JsonResponse({'success': True, 'case_id': case.id, 'case_date': case.case_date}, status=201)
+            except Exception as e:
+                 # Log the exception e
+                 print(f"Error saving case: {e}")
+                 return JsonResponse({'success': False, 'errors': {'__all__': 'An error occurred while saving the case.'}}, status=500)
+        else:
+            # Return form validation errors
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)

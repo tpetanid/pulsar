@@ -1,9 +1,12 @@
 const ownerApp = Vue.createApp({
+    // Register the component
+    components: {
+        'owner-create-edit-modal': OwnerCreateEditModal
+    },
     data() {
         return {
             owners: [],
             isLoading: true,
-            isSaving: false,
             isDeleting: false,
             // Pagination state
             currentPage: 1,
@@ -13,21 +16,9 @@ const ownerApp = Vue.createApp({
             hasPreviousPage: false,
             hasNextPage: false,
             // Modals state
-            showCreateEditModal: false,
             showDeleteModal: false,
             showViewModal: false,
-            isEditMode: false,
             currentOwner: {}, // For Delete/View modals
-            ownerForm: { // For Create/Edit modal
-                id: null,
-                last_name: '',
-                first_name: '',
-                email: '',
-                telephone: '',
-                address: '',
-                comments: '',
-            },
-            formErrors: {}, // To display validation errors
             // Filter state
             showFilters: false,
             searchQuery: '',
@@ -54,9 +45,6 @@ const ownerApp = Vue.createApp({
     },
     delimiters: ['[[', ']]'], // Use different delimiters if needed
     computed: {
-        modalTitle() {
-            return this.isEditMode ? 'Edit Owner' : 'Add New Owner';
-        },
         firstOwnerIndex() {
             if (this.totalOwners === 0) return 0;
             return (this.currentPage - 1) * this.perPage + 1;
@@ -172,46 +160,11 @@ const ownerApp = Vue.createApp({
              }
              this.fetchPaginatedOwners(); // Re-fetch data with new sorting
          },
-        resetForm() {
-            this.ownerForm = { id: null, last_name: '', first_name: '', email: '', telephone: '', address: '', comments: '' };
-            this.formErrors = {};
-        },
         openCreateModal() {
-            this.resetForm();
-            this.isEditMode = false;
-            this.showCreateEditModal = true;
-            this.$nextTick(() => {
-                // Focus first input element for accessibility
-                const firstInput = this.$refs.createEditModal?.querySelector('input, textarea');
-                 if (firstInput) firstInput.focus();
-            });
+            this.$refs.createEditModal.openModal(); // Call component's method
         },
         openEditModal(owner) {
-             this.resetForm();
-             this.isEditMode = true;
-             // Fetch full details in case list view doesn't have everything (like comments/address)
-             // Or, if list view HAS everything, just populate directly:
-             // this.ownerForm = { ...owner }; // Shallow copy
-             // Fetching full details is safer if list view is optimized
-             const detailUrl = this.detailApiUrlBase.replace('/0/', `/${owner.id}/`); // Replace placeholder
-             axios.get(detailUrl)
-                 .then(response => {
-                     // Check if response is the owner object directly
-                     if (response.data && response.data.id) {
-                         this.ownerForm = response.data;
-                         this.showCreateEditModal = true;
-                          this.$nextTick(() => {
-                            const firstInput = this.$refs.createEditModal?.querySelector('input, textarea');
-                            if (firstInput) firstInput.focus();
-                        });
-                     } else {
-                          console.error("Error: Invalid owner data received", response.data);
-                     }
-                 })
-                 .catch(error => {
-                      console.error("Error fetching owner details:", error);
-                      alert("Failed to load owner details for editing."); // Simple user feedback
-                 });
+             this.$refs.createEditModal.openModal(owner); // Pass owner data to component
          },
         openDeleteModal(owner) {
             this.currentOwner = owner;
@@ -244,78 +197,38 @@ const ownerApp = Vue.createApp({
                  });
          },
         openEditFromViewModal() {
-            // Get the owner details currently being viewed
             const ownerToEdit = this.currentOwner;
-            // Close the view modal first
-            this.closeModal();
-            // Then, open the edit modal with the fetched owner data
-            // Use nextTick to ensure the view modal is fully closed before opening edit
+            this.closeModal(); // Close the view modal
             this.$nextTick(() => {
+                // Call the component's openModal method for editing
                if (ownerToEdit && ownerToEdit.id) {
-                   this.openEditModal(ownerToEdit);
+                   this.openEditModal(ownerToEdit); // This now calls the ref
                } else {
                    console.error("Cannot open edit modal: current owner data is missing or invalid.");
-                   // Optionally show an error to the user
                 }
            });
         },
         closeModal(event) {
-             // Close any modal if backdrop is clicked (event.target === event.currentTarget)
-             // or if called directly without event (e.g., from button)
+             // Close only Delete and View modals if backdrop is clicked
+             // The create/edit modal handles its own closing via internal methods
              if (!event || event.target === event.currentTarget) {
-                 this.showCreateEditModal = false;
                  this.showDeleteModal = false;
                  this.showViewModal = false;
-                 this.resetForm(); // Clear form data when closing
-                 this.currentOwner = {}; // Clear current owner
+                 this.currentOwner = {}; // Clear current owner for view/delete
              }
+             // Note: Don't reset the create/edit form here
          },
-        saveOwner() {
-            this.isSaving = true;
-            this.formErrors = {}; // Clear previous errors
-            let url = this.createApiUrl;
-            let method = 'post';
-
-            if (this.isEditMode && this.ownerForm.id) {
-                 url = this.updateApiUrlBase.replace('/0/', `/${this.ownerForm.id}/`);
-                // Method remains 'post' as the backend view handles update on POST
-                // If backend used PUT: method = 'put';
-            }
-
-            axios({
-                method: method,
-                url: url,
-                data: this.ownerForm,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.csrfToken
-                }
-            })
-            .then(response => {
-                if (response.data.success) {
-                    this.closeModal();
-                    this.fetchPaginatedOwners(); // Refresh the list
-                    // Optionally show success notification
-                } else if (response.data.errors) {
-                     // This case is handled by the catch block for 400 status
-                     // console.error("Validation Errors:", response.data.errors);
-                     // this.formErrors = response.data.errors;
-                }
-            })
-            .catch(error => {
-                if (error.response && error.response.status === 400 && error.response.data.errors) {
-                    // Handle validation errors from Django form
-                    this.formErrors = error.response.data.errors;
-                    console.error("Validation Errors:", this.formErrors);
-                } else {
-                    console.error("Error saving owner:", error);
-                    // Display a generic error message?
-                     this.formErrors = { non_field_errors: ['An unexpected error occurred. Please try again.'] };
-                }
-            })
-            .finally(() => {
-                this.isSaving = false;
-            });
+        handleOwnerSaved(savedOwnerData) {
+            console.log("Owner saved event received:", savedOwnerData);
+            // Refresh the owner list to show the new/updated data
+            this.fetchPaginatedOwners();
+            // Optional: Show a success notification here
+        },
+        focusAddButtonMaybe() {
+            // Optional: Refocus the 'Add New Owner' button after modal closes for better flow
+            this.$nextTick(() => {
+                 this.$refs.addButton?.focus();
+             });
         },
         deleteOwnerConfirm() {
             this.isDeleting = true;
@@ -356,10 +269,11 @@ const ownerApp = Vue.createApp({
              this.isLoading = false; // Stop loading indicator
              // Maybe display an error message to the user
          }
-        // Add event listener for Escape key to close modals
+        // Modify event listener: Component handles its own Escape key
          window.addEventListener('keydown', (event) => {
              if (event.key === 'Escape') {
-                 if (this.showCreateEditModal || this.showDeleteModal || this.showViewModal) {
+                 // Only close Delete/View modals from the main app listener
+                 if (this.showDeleteModal || this.showViewModal) {
                     this.closeModal();
                  }
              }
@@ -367,8 +281,10 @@ const ownerApp = Vue.createApp({
     },
      beforeUnmount() {
          // Clean up event listener when the component is destroyed
-         window.removeEventListener('keydown', this.closeModal);
+         // Need to store the listener function reference to remove it correctly
+         // window.removeEventListener('keydown', this.globalKeydownListener); 
      }
 });
 
+// Mount the app AFTER defining components it uses
 ownerApp.mount('#owner-app'); 

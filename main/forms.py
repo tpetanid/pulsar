@@ -1,5 +1,6 @@
 from django import forms
-from .models import Owner, Species, Breed, Patient
+from django.utils import timezone
+from .models import Owner, Species, Breed, Patient, Case
 
 class OwnerForm(forms.ModelForm):
     class Meta:
@@ -44,3 +45,29 @@ class PatientForm(forms.ModelForm):
         # Add any other cross-field validation here
 
         return cleaned_data 
+
+# --- Case Form --- #
+
+class CaseForm(forms.ModelForm):
+    class Meta:
+        model = Case
+        fields = ['owner', 'patient', 'case_date', 'complaint', 'history']
+        widgets = {
+            'owner': forms.HiddenInput(), # Owner will be set based on selection
+            'patient': forms.HiddenInput(), # Patient will be set based on selection
+            'case_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure owner and patient are not required at the form level
+        # as they will be handled/validated in the view/frontend logic
+        # before this form is instantiated with IDs.
+        self.fields['owner'].required = False
+        self.fields['patient'].required = False
+
+    def clean_case_date(self):
+        case_date = self.cleaned_data.get('case_date')
+        if case_date and case_date > timezone.now().date():
+            raise forms.ValidationError("The case date cannot be in the future.")
+        return case_date 

@@ -163,16 +163,16 @@ const OwnerCreateEditModal = {
                 
                 <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
                     <div class="mt-3 text-center">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">[[ modalTitle ]]</h3>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ modalTitle }}</h3>
                         <form @submit.prevent="saveOwner" class="space-y-4 text-left">
-                            <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">[[ formErrors.non_field_errors.join(', ') ]]</div>
+                            <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">{{ formErrors.non_field_errors.join(', ') }}</div>
                             
                             <div>
                                 <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name *</label>
                                 <input type="text" v-model="ownerForm.last_name" id="last_name" required
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.last_name, 'border-gray-300': !formErrors.last_name}">
-                                <p v-if="formErrors.last_name" class="mt-1 text-xs text-red-500">[[ formErrors.last_name.join(', ') ]]</p>
+                                <p v-if="formErrors.last_name" class="mt-1 text-xs text-red-500">{{ formErrors.last_name.join(', ') }}</p>
                             </div>
                             
                             <div>
@@ -180,7 +180,7 @@ const OwnerCreateEditModal = {
                                 <input type="text" v-model="ownerForm.first_name" id="first_name"
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.first_name, 'border-gray-300': !formErrors.first_name}">
-                                 <p v-if="formErrors.first_name" class="mt-1 text-xs text-red-500">[[ formErrors.first_name.join(', ') ]]</p>
+                                 <p v-if="formErrors.first_name" class="mt-1 text-xs text-red-500">{{ formErrors.first_name.join(', ') }}</p>
                             </div>
                              
                             <div>
@@ -188,7 +188,7 @@ const OwnerCreateEditModal = {
                                 <input type="email" v-model="ownerForm.email" id="email"
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.email, 'border-gray-300': !formErrors.email}">
-                                <p v-if="formErrors.email" class="mt-1 text-xs text-red-500">[[ formErrors.email.join(', ') ]]</p>
+                                <p v-if="formErrors.email" class="mt-1 text-xs text-red-500">{{ formErrors.email.join(', ') }}</p>
                             </div>
                             
                             <div>
@@ -196,7 +196,7 @@ const OwnerCreateEditModal = {
                                 <input type="tel" v-model="ownerForm.telephone" id="telephone"
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.telephone, 'border-gray-300': !formErrors.telephone}">
-                                 <p v-if="formErrors.telephone" class="mt-1 text-xs text-red-500">[[ formErrors.telephone.join(', ') ]]</p>
+                                 <p v-if="formErrors.telephone" class="mt-1 text-xs text-red-500">{{ formErrors.telephone.join(', ') }}</p>
                             </div>
                             
                             <div>
@@ -204,7 +204,7 @@ const OwnerCreateEditModal = {
                                 <textarea v-model="ownerForm.address" id="address" rows="3"
                                           class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                           :class="{'border-red-500': formErrors.address, 'border-gray-300': !formErrors.address}"></textarea>
-                                <p v-if="formErrors.address" class="mt-1 text-xs text-red-500">[[ formErrors.address.join(', ') ]]</p>
+                                <p v-if="formErrors.address" class="mt-1 text-xs text-red-500">{{ formErrors.address.join(', ') }}</p>
                             </div>
                              
                             <div>
@@ -212,13 +212,13 @@ const OwnerCreateEditModal = {
                                 <textarea v-model="ownerForm.comments" id="comments" rows="3"
                                           class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                           :class="{'border-red-500': formErrors.comments, 'border-gray-300': !formErrors.comments}"></textarea>
-                                <p v-if="formErrors.comments" class="mt-1 text-xs text-red-500">[[ formErrors.comments.join(', ') ]]</p>
+                                <p v-if="formErrors.comments" class="mt-1 text-xs text-red-500">{{ formErrors.comments.join(', ') }}</p>
                             </div>
 
                             <div class="items-center px-4 py-3 border-t border-gray-200 mt-4 text-right">
                                 <button type="submit" :disabled="isSaving"
                                         class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50">
-                                    [[ isSaving ? 'Saving...' : 'Save' ]]
+                                    {{ isSaving ? 'Saving...' : 'Save' }}
                                 </button>
                                 <button type="button" @click="closeModalInternal"
                                         class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">

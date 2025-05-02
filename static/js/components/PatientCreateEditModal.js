@@ -450,16 +450,16 @@ const PatientCreateEditModal = {
 
                 <div @click.stop class="relative mx-auto p-5 border w-full max-w-xl shadow-lg rounded-md bg-white">
                     <div class="mt-3 text-center">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">[[ modalTitle ]]</h3>
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">{{ modalTitle }}</h3>
                         <form @submit.prevent="savePatient" class="space-y-4 text-left">
-                            <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">[[ formErrors.non_field_errors.join(', ') ]]</div>
+                            <div v-if="formErrors.non_field_errors" class="text-red-500 text-sm mb-2">{{ formErrors.non_field_errors.join(', ') }}</div>
 
                             <!-- Owner Selection -->
                             <div>
                                 <label for="owner-select" class="block text-sm font-medium text-gray-700">Owner *</label>
                                 <select id="owner-select" placeholder="Type to search owners..." required></select>
                                 <p v-if="isLoadingOwners" class="text-xs text-gray-500 italic">Loading owners...</p>
-                                <p v-if="formErrors.owner" class="mt-1 text-xs text-red-500">[[ formErrors.owner.join(', ') ]]</p>
+                                <p v-if="formErrors.owner" class="mt-1 text-xs text-red-500">{{ formErrors.owner.join(', ') }}</p>
                             </div>
 
                             <!-- Patient Name -->
@@ -468,7 +468,7 @@ const PatientCreateEditModal = {
                                 <input type="text" v-model="patientForm.name" id="name" required
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.name, 'border-gray-300': !formErrors.name}">
-                                <p v-if="formErrors.name" class="mt-1 text-xs text-red-500">[[ formErrors.name.join(', ') ]]</p>
+                                <p v-if="formErrors.name" class="mt-1 text-xs text-red-500">{{ formErrors.name.join(', ') }}</p>
                             </div>
 
                             <!-- Species Selection -->
@@ -477,12 +477,12 @@ const PatientCreateEditModal = {
                                  <select v-model="patientForm.species" id="species" required
                                         class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                         :class="{'border-red-500': formErrors.species, 'border-gray-300': !formErrors.species}">
-                                    <option :value="null" disabled>[[ isLoadingSpecies ? 'Loading...' : 'Select Species' ]]</option>
+                                    <option :value="null" disabled>{{ isLoadingSpecies ? 'Loading...' : 'Select Species' }}</option>
                                     <option v-for="spec in availableSpecies" :key="spec.code" :value="spec.code">
-                                        [[ spec.code ]]
+                                        {{ spec.code }}
                                     </option>
                                 </select>
-                                <p v-if="formErrors.species" class="mt-1 text-xs text-red-500">[[ formErrors.species.join(', ') ]]</p>
+                                <p v-if="formErrors.species" class="mt-1 text-xs text-red-500">{{ formErrors.species.join(', ') }}</p>
                             </div>
 
                             <!-- Breed Selection (TomSelect) -->
@@ -490,7 +490,7 @@ const PatientCreateEditModal = {
                                 <label for="breed-select" class="block text-sm font-medium text-gray-700">Breed *</label>
                                 <select id="breed-select" placeholder="Select Species first..." required :disabled="!patientForm.species || isLoadingBreeds"></select>
                                 <p v-if="isLoadingBreeds" class="text-xs text-gray-500 italic">Loading breeds...</p>
-                                <p v-if="formErrors.breed" class="mt-1 text-xs text-red-500">[[ formErrors.breed.join(', ') ]]</p>
+                                <p v-if="formErrors.breed" class="mt-1 text-xs text-red-500">{{ formErrors.breed.join(', ') }}</p>
                             </div>
 
                             <!-- Sex Selection -->
@@ -502,11 +502,11 @@ const PatientCreateEditModal = {
                                     <option value="M">Male</option>
                                     <option value="F">Female</option>
                                 </select>
-                                <p v-if="formErrors.sex" class="mt-1 text-xs text-red-500">[[ formErrors.sex.join(', ') ]]</p>
+                                <p v-if="formErrors.sex" class="mt-1 text-xs text-red-500">{{ formErrors.sex.join(', ') }}</p>
                             </div>
 
                             <!-- Intact Checkbox -->
-                             <div class="flex items-start pt-2"> {# Added padding top #}
+                             <div class="flex items-start pt-2"> 
                                   <div class="flex items-center h-5">
                                     <input id="intact" name="intact" type="checkbox" v-model="patientForm.intact"
                                            class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
@@ -514,7 +514,7 @@ const PatientCreateEditModal = {
                                   <div class="ml-3 text-sm">
                                     <label for="intact" class="font-medium text-gray-700">Intact (Unneutered/Unspayed)</label>
                                   </div>
-                                  {# Removed error display here as it's unlikely #}
+                                  
                              </div>
 
                             <!-- Age Input -->
@@ -533,9 +533,9 @@ const PatientCreateEditModal = {
                                         <option value="years">Years</option>
                                     </select>
                                 </div>
-                                 <p v-if="formErrors.date_of_birth" class="mt-1 text-xs text-red-500">[[ formErrors.date_of_birth.join(', ') ]]</p>
-                                 <p v-if="formErrors.ageValue" class="mt-1 text-xs text-red-500">[[ formErrors.ageValue.join(', ') ]]</p>
-                                 <p v-if="formErrors.ageUnit" class="mt-1 text-xs text-red-500">[[ formErrors.ageUnit.join(', ') ]]</p>
+                                 <p v-if="formErrors.date_of_birth" class="mt-1 text-xs text-red-500">{{ formErrors.date_of_birth.join(', ') }}</p>
+                                 <p v-if="formErrors.ageValue" class="mt-1 text-xs text-red-500">{{ formErrors.ageValue.join(', ') }}</p>
+                                 <p v-if="formErrors.ageUnit" class="mt-1 text-xs text-red-500">{{ formErrors.ageUnit.join(', ') }}</p>
                             </div>
 
                             <!-- Weight -->
@@ -544,14 +544,14 @@ const PatientCreateEditModal = {
                                 <input type="number" step="0.01" min="0" v-model.number="patientForm.weight" id="weight" required
                                        class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                        :class="{'border-red-500': formErrors.weight, 'border-gray-300': !formErrors.weight}">
-                                <p v-if="formErrors.weight" class="mt-1 text-xs text-red-500">[[ formErrors.weight.join(', ') ]]</p>
+                                <p v-if="formErrors.weight" class="mt-1 text-xs text-red-500">{{ formErrors.weight.join(', ') }}</p>
                             </div>
 
                             <!-- Action Buttons -->
                             <div class="items-center px-4 py-3 border-t border-gray-200 mt-4 text-right">
                                 <button type="submit" :disabled="isSaving"
                                         class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50">
-                                    [[ isSaving ? 'Saving...' : 'Save' ]]
+                                    {{ isSaving ? 'Saving...' : 'Save' }}
                                 </button>
                                 <button type="button" @click="closeModalInternal"
                                         class="ml-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300">

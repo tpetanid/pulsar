@@ -49,3 +49,13 @@
     - Vue.js is essential for the current dynamic UI implementation (rendering, state management, event handling).
     - Axios is used only for making AJAX calls to the backend API and can be replaced by the native browser `fetch` API.
 - **Action:** Consider refactoring API calls to use `fetch` instead of Axios in the future to reduce dependencies. This would require modifying the JavaScript logic in both `owner_list.js` and the `manage.html` template script. 
+
+## Vue Delimiter Issue in OwnerCreateEditModal
+
+- **Problem**: The `OwnerCreateEditModal` component (`static/js/components/OwnerCreateEditModal.js`) was displaying literal `[[ modalTitle ]]` and `[[ isSaving ? 'Saving...' : 'Save' ]]` instead of the interpolated values.
+- **Investigation**: 
+    - Checked the main Vue app initialization in `static/js/owner_list.js` and confirmed `delimiters: ['[[', ']]']` was correctly set.
+    - No console errors were present.
+    - Temporarily changed delimiters in the component's template to `{{ }}` for diagnosis.
+- **Resolution**: Changing the delimiters in the component's template string to the default `{{ }}` fixed the rendering. The global `delimiters` setting was not being applied to this specific component's template string, possibly due to how the component object literal's template is processed.
+- **Solution**: Updated the `OwnerCreateEditModal.js` template to consistently use `{{ }}` for all interpolations. 

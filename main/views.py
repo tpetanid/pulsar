@@ -463,6 +463,8 @@ class PatientListAPIView(View):
         # --- Parameter Parsing (Filtering) ---
         query = request.GET.get('query', '').strip()
         filter_fields = request.GET.getlist('filter_fields')
+        owner_id_filter = request.GET.get('owner_id')
+
         if not filter_fields:
             filter_fields = self.DEFAULT_FILTER_FIELDS
         
@@ -489,6 +491,16 @@ class PatientListAPIView(View):
             for field_name in valid_filter_fields:
                 q_objects |= Q(**{f'{field_name}__icontains': query})
             patient_queryset = patient_queryset.filter(q_objects)
+
+        # Filter by owner if owner_id is provided
+        if owner_id_filter:
+            try:
+                owner_id_int = int(owner_id_filter)
+                patient_queryset = patient_queryset.filter(owner_id=owner_id_int)
+            except ValueError:
+                # Optional: Handle invalid owner_id (e.g., return error or ignore)
+                # For now, we'll just ignore an invalid ID
+                pass
 
         # --- Apply Sorting ---
         # Handle related field sorting (owner__last_name requires secondary sort on first_name)
@@ -892,8 +904,6 @@ class PatientImportPreviewView(View):
 
             if not any(h in actual_headers_set for h in date_or_age_headers):
                  return JsonResponse({'success': False, 'error': 'Missing required column: Must include either "date_of_birth" or "age_years".'}, status=400)
-
-            # Optional: Check for disallowed headers? For now, we just ignore extra columns during processing.
 
             # Process rows: count all, preview first N
             for i, row in enumerate(reader):

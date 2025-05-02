@@ -306,7 +306,11 @@ const PatientCreateEditModal = {
                 options: initialOwner ? [initialOwner] : [],
                 items: initialOwner ? [initialOwner.id] : [],
                 create: false,
-                onFocus: () => { this.isLoadingOwners = true; }, // Indicate loading on focus
+                onFocus: () => { 
+                    this.isLoadingOwners = true; 
+                    // Trigger load immediately on focus with empty query
+                    this.ownerTomSelect?.load(''); // Use optional chaining just in case
+                 }, 
                  onBlur: () => { this.isLoadingOwners = false; }, // Reset loading on blur
                  load: (query, callback) => {
                      this.isLoadingOwners = true;
@@ -348,7 +352,13 @@ const PatientCreateEditModal = {
                 items: initialBreed ? [initialBreed.id] : [],
                 create: false,
                 placeholder: this.patientForm.species ? 'Type or select a breed...' : 'Select Species first...',
-                 onFocus: () => { this.isLoadingBreeds = true; }, // Indicate loading on focus
+                 onFocus: () => { 
+                     this.isLoadingBreeds = true; 
+                     // Trigger load immediately on focus with empty query, only if species is selected
+                     if (this.patientForm.species) {
+                         this.breedTomSelect?.load(''); // Use optional chaining
+                     }
+                 }, 
                  onBlur: () => { this.isLoadingBreeds = false; }, // Reset loading on blur
                  load: (query, callback) => {
                     const currentSpeciesCode = this.patientForm.species;

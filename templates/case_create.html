@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create New Case - Vet Cardio App{% endblock title %}
+
+{% block extra_head %}
+    {# Tom Select CSS #}
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    {# Add styles for modal transition if not already in base #}
+    <style>
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+        }
+        /* Style for TomSelect loading */
+        .ts-wrapper.loading::after {
+            content: ' Loading...';
+            display: inline-block;
+            margin-left: 5px;
+            font-style: italic;
+            color: #888;
+        }
+    </style>
+{% endblock extra_head %}
+
+{% block content %}
+    <div id="case-create-app" class="py-8"
+         data-csrf-token="{{ csrf_token }}"
+         data-owner-list-api-url="{% url 'owner-list-api' %}?minimal=true" {# Get minimal owner data for dropdown #}
+         data-patient-list-api-url="{% url 'patient-list-api' %}" {# Vue will add owner_id param #}
+         data-case-create-api-url="{% url 'case-create-api' %}"
+         >
+
+        <div class="max-w-3xl mx-auto sm:px-6 lg:px-8 bg-white shadow sm:rounded-lg p-6">
+
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Create New Case</h1>
+
+            {# Display non-field errors #}
+            <div v-if="formErrors.non_field_errors" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <strong class="font-bold">Error:</strong>
+              <span class="block sm:inline" v-for="error in formErrors.non_field_errors">[[ error ]]</span>
+            </div>
+
+            {# Step 1: Select Owner #}
+            <div class="mb-6">
+                <label for="owner-select" class="block text-sm font-medium text-gray-700">1. Select Owner *</label>
+                <select id="owner-select" placeholder="Type to search owners by name or email..." required></select>
+                <p v-if="loading.owners" class="text-xs text-gray-500 italic">Loading owners...</p>
+                <p v-if="formErrors.owner" class="mt-1 text-xs text-red-500">[[ formErrors.owner.join(', ') ]]</p>
+                 {# Option to add owner could go here later #}
+            </div>
+
+            {# Step 2: Select Patient (conditional) #}
+            <transition name="fade">
+                <div v-if="selectedOwner.id" class="mb-6">
+                    <label for="patient-select" class="block text-sm font-medium text-gray-700">2. Select Patient for [[ selectedOwner.name ]] *</label>
+                    <select id="patient-select" 
+                            v-model="selectedPatient.id" 
+                            @change="handlePatientSelected($event)" 
+                            required 
+                            :disabled="loading.patients || ownerPatientsList.length === 0"
+                            class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            :class="{'border-red-500': formErrors.patient, 'border-gray-300': !formErrors.patient}">
+                        {# Use verbatim to prevent Django parsing Vue syntax #}
+                        <option :value="null" disabled>{% verbatim %}[[ loading.patients ? 'Loading...' : (ownerPatientsList.length === 0 ? 'No patients found' : '-- Select Patient --') ]]{% endverbatim %}</option>
+                        <option v-for="patient in ownerPatientsList" :key="patient.id" :value="patient.id">
+                            [[ patient.display_text ]]
+                        </option>
+                    </select>
+                    <p v-if="loading.patients" class="text-xs text-gray-500 italic">Loading patients for this owner...</p>
+                    <p v-if="formErrors.patient" class="mt-1 text-xs text-red-500">[[ formErrors.patient.join(', ') ]]</p>
+                    {# Option to add patient could go here later #}
+                </div>
+            </transition>
+
+            {# Step 3: Case Details (conditional) #}
+            <transition name="fade">
+                <div v-if="selectedPatient.id" class="border-t border-gray-200 pt-6">
+                     <h2 class="text-lg font-semibold text-gray-700 mb-4">3. Case Details for [[ selectedPatient.name ]]</h2>
+                    <form @submit.prevent="saveCase" class="space-y-4">
+                        {# Case Date #}
+                         <div>
+                            <label for="case_date" class="block text-sm font-medium text-gray-700">Case Date *</label>
+                            <input type="date" v-model="caseForm.case_date" id="case_date" required :max="todayDate"
+                                   class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   :class="{'border-red-500': formErrors.case_date, 'border-gray-300': !formErrors.case_date}">
+                            <p v-if="formErrors.case_date" class="mt-1 text-xs text-red-500">[[ formErrors.case_date.join(', ') ]]</p>
+                        </div>
+
+                        {# Complaint #}
+                        <div>
+                            <label for="complaint" class="block text-sm font-medium text-gray-700">Complaint</label>
+                            <textarea v-model="caseForm.complaint" id="complaint" rows="4"
+                                      class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                      :class="{'border-red-500': formErrors.complaint, 'border-gray-300': !formErrors.complaint}"></textarea>
+                            <p v-if="formErrors.complaint" class="mt-1 text-xs text-red-500">[[ formErrors.complaint.join(', ') ]]</p>
+                        </div>
+
+                        {# History #}
+                        <div>
+                            <label for="history" class="block text-sm font-medium text-gray-700">History</label>
+                            <textarea v-model="caseForm.history" id="history" rows="6"
+                                      class="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                      :class="{'border-red-500': formErrors.history, 'border-gray-300': !formErrors.history}"></textarea>
+                            <p v-if="formErrors.history" class="mt-1 text-xs text-red-500">[[ formErrors.history.join(', ') ]]</p>
+                        </div>
+
+                        {# Submit Button #}
+                        <div class="text-right">
+                             <button type="submit" :disabled="isSaving"
+                                    class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+                                [[ isSaving ? 'Saving Case...' : 'Save Case' ]]
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </transition>
+
+        </div> {# End max-w wrapper #}
+    </div> {# End #case-create-app #}
+{% endblock content %}
+
+{% block scripts %}
+    {# Load Vue, Axios, TomSelect JS #}
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
+    {# Load the new Vue app logic #}
+    <script src="{% static 'js/case_create.js' %}"></script>
+{% endblock scripts %} 
